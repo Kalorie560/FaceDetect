@@ -83,6 +83,22 @@ class FacialKeypointsTrainer:
     def _init_clearml(self, config: Dict[str, Any]):
         """Initialize ClearML task and logger."""
         try:
+            # Configure ClearML authentication from YAML if credentials are provided
+            api_config = config.get('api', {})
+            credentials = api_config.get('credentials', {})
+            
+            if credentials.get('access_key') and credentials.get('secret_key'):
+                # Set up authentication using credentials from YAML
+                from clearml import Task
+                Task.set_credentials(
+                    api_host=api_config.get('api_server', 'https://api.clear.ml'),
+                    web_host=api_config.get('web_server', 'https://app.clear.ml'),
+                    files_host=api_config.get('files_server', 'https://files.clear.ml'),
+                    key=credentials['access_key'],
+                    secret=credentials['secret_key']
+                )
+                print("ClearML authentication configured from YAML file")
+            
             # Extract experiment configuration
             experiment_config = config.get('experiment', {})
             

@@ -5,6 +5,7 @@ clearml:
     files_server: https://files.clear.ml
     credentials:
       # Replace with your actual ClearML credentials
+      # These credentials will be used for authentication instead of environment variables or ~/clearml.conf
       access_key: YOUR_ACCESS_KEY_HERE
       secret_key: YOUR_SECRET_KEY_HERE
   
