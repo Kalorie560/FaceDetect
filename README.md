@@ -134,13 +134,14 @@ pip install -r requirements.txt
 
 ##### ClearML Configuration
 ```bash
-# Copy and edit the ClearML configuration
-cp config/clearml.yaml config/clearml_local.yaml
-
-# Edit config/clearml_local.yaml with your credentials:
+# Edit the ClearML configuration file with your credentials
+# config/clearml.yaml:
 # - Replace YOUR_ACCESS_KEY_HERE with your ClearML access key
 # - Replace YOUR_SECRET_KEY_HERE with your ClearML secret key
-# - Replace YOUR_WORKSPACE_NAME with your workspace name
+# - Update the project_name and experiment settings as needed
+
+# The system uses config/clearml.yaml by default
+# You can specify a different config file using the --clearml_config flag
 ```
 
 ##### Training Configuration
@@ -229,7 +230,16 @@ python src/training/train.py \
     --model_type efficientnet_b0 \
     --epochs 150 \
     --batch_size 64 \
-    --clearml_config config/clearml_local.yaml \
+    --clearml_config config/clearml.yaml \
+    --project_name "facial_keypoints_detection" \
+    --experiment_name "efficientnet_b0_experiment"
+
+# Or use the default config file (config/clearml.yaml)
+python src/training/train.py \
+    --data_path ./training.csv \
+    --model_type efficientnet_b0 \
+    --epochs 150 \
+    --batch_size 64 \
     --project_name "facial_keypoints_detection" \
     --experiment_name "efficientnet_b0_experiment"
 ```
@@ -426,13 +436,14 @@ pip install -r requirements.txt
 
 #### 2. ClearML設定方法
 ```bash
-# ClearML設定をコピーして編集
-cp config/clearml.yaml config/clearml_local.yaml
-
-# config/clearml_local.yamlを認証情報で編集:
+# ClearML設定ファイルを認証情報で編集
+# config/clearml.yaml:
 # - YOUR_ACCESS_KEY_HEREをClearMLアクセスキーに置換
 # - YOUR_SECRET_KEY_HEREをClearMLシークレットキーに置換
-# - YOUR_WORKSPACE_NAMEをワークスペース名に置換
+# - project_nameと実験設定を必要に応じて更新
+
+# システムはデフォルトでconfig/clearml.yamlを使用します
+# --clearml_configフラグで別の設定ファイルを指定できます
 ```
 
 #### 3. データセットの準備
