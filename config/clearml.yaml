@@ -10,7 +10,6 @@ clearml:
   
   # Project configuration
   project_name: "facial_keypoints_detection"
-  workspace: "YOUR_WORKSPACE_NAME"
   
   # Experiment configuration
   experiment:
