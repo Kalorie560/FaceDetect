@@ -38,30 +38,46 @@ class FacialKeypointsDataset(Dataset):
             handle_missing: How to handle missing keypoints ('drop', 'interpolate', 'zero')
             image_size: Target size for images (height, width)
         """
-        if csv_file is not None:
-            self.data = pd.read_csv(csv_file)
-        else:
-            self.data = None
         self.transform = transform
         self.augmentation = augmentation
         self.image_size = image_size
+        self.handle_missing = handle_missing
         
-        # Handle missing values only if data is loaded
-        if self.data is not None:
-            if handle_missing == 'drop':
-                self.data = self.data.dropna()
-            elif handle_missing == 'interpolate':
-                self.data = self._interpolate_missing()
-            elif handle_missing == 'zero':
-                self.data = self.data.fillna(0)
-            
-            # Extract keypoint column names
-            self.keypoint_cols = [col for col in self.data.columns if col != 'Image']
-            
-            # Reset index after potential dropping
-            self.data = self.data.reset_index(drop=True)
+        if csv_file is not None:
+            self.data = pd.read_csv(csv_file)
+            self._process_data()
         else:
+            self.data = None
             self.keypoint_cols = []
+    
+    def _process_data(self):
+        """Process the loaded data according to handle_missing strategy."""
+        if self.data is None:
+            return
+            
+        # Extract keypoint column names first
+        self.keypoint_cols = [col for col in self.data.columns if col != 'Image']
+        
+        # Handle missing values
+        if self.handle_missing == 'drop':
+            self.data = self.data.dropna()
+        elif self.handle_missing == 'interpolate':
+            self.data = self._interpolate_missing()
+        elif self.handle_missing == 'zero':
+            self.data = self.data.fillna(0)
+        
+        # Reset index after potential dropping
+        self.data = self.data.reset_index(drop=True)
+    
+    def set_data(self, data_df: pd.DataFrame):
+        """
+        Set the dataset data manually.
+        
+        Args:
+            data_df: DataFrame containing the dataset
+        """
+        self.data = data_df.copy()
+        self._process_data()
         
     def _interpolate_missing(self) -> pd.DataFrame:
         """Interpolate missing keypoint values using available data."""
