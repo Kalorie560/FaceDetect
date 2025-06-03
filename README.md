@@ -131,12 +131,28 @@ cp config/clearml.yaml config/clearml_local.yaml
 ```
 
 #### 3. Data Preparation
+
+##### Dataset File Placement
+Place the competition dataset files in the project root directory:
+```
+FaceDetect/
+├── training.csv        # Training data with images and keypoints
+├── test.csv           # Test data with images only
+├── IdLookupTable.csv  # Maps image IDs to keypoint labels
+└── ... (other project files)
+```
+
+##### Download and Setup
 ```bash
 # Download Kaggle data
 kaggle competitions download -c facial-keypoints-detection
 
-# Extract data
-unzip facial-keypoints-detection.zip
+# Extract data to project root
+unzip facial-keypoints-detection.zip -d .
+
+# Verify files are in the correct location
+ls -la *.csv
+# Should show: training.csv, test.csv, IdLookupTable.csv
 
 # The training.csv file should contain:
 # - 'Image' column with space-separated pixel values
@@ -148,7 +164,7 @@ unzip facial-keypoints-detection.zip
 #### Basic Training
 ```bash
 python src/training/train.py \
-    --data_path training.csv \
+    --data_path ./training.csv \
     --model_type resnet18 \
     --epochs 100 \
     --batch_size 32 \
@@ -158,7 +174,7 @@ python src/training/train.py \
 #### Advanced Training with ClearML
 ```bash
 python src/training/train.py \
-    --data_path training.csv \
+    --data_path ./training.csv \
     --model_type efficientnet_b0 \
     --epochs 150 \
     --batch_size 64 \
@@ -339,12 +355,41 @@ cp config/clearml.yaml config/clearml_local.yaml
 # - YOUR_WORKSPACE_NAMEをワークスペース名に置換
 ```
 
+#### 3. データセットの準備
+
+##### データセットファイルの配置場所
+コンペティションのデータセットファイルをプロジェクトのルートディレクトリに配置してください:
+```
+FaceDetect/
+├── training.csv        # 訓練データ（画像と特徴点）
+├── test.csv           # テストデータ（画像のみ）
+├── IdLookupTable.csv  # 画像IDと特徴点ラベルのマッピング
+└── ... (その他のプロジェクトファイル)
+```
+
+##### ダウンロードとセットアップ
+```bash
+# Kaggleデータのダウンロード
+kaggle competitions download -c facial-keypoints-detection
+
+# プロジェクトルートにデータを展開
+unzip facial-keypoints-detection.zip -d .
+
+# ファイルが正しい場所にあることを確認
+ls -la *.csv
+# 結果: training.csv, test.csv, IdLookupTable.csv が表示されるはず
+
+# training.csvには以下が含まれています:
+# - 'Image'列: スペース区切りの画素値
+# - 30個の特徴点座標列
+```
+
 ### モデル学習の実行方法
 
 #### 基本的な学習
 ```bash
 python src/training/train.py \
-    --data_path training.csv \
+    --data_path ./training.csv \
     --model_type resnet18 \
     --epochs 100 \
     --batch_size 32 \
