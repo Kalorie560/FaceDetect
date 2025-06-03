@@ -48,7 +48,10 @@ FaceDetect/
 ├── test_clearml_integration.py # ClearML integration tests
 ├── test_config_loading.py     # Configuration loading tests
 ├── test_fix.py           # Additional test utilities
+├── test_json_fix.py      # JSON handling test utilities
+├── test_transforms.py    # Data transformation tests
 ├── test_training.csv     # Sample training data for testing
+├── verify_fixes.py       # Fix verification script
 ├── requirements.txt      # Python dependencies
 └── README.md            # This file
 ```
@@ -197,6 +200,7 @@ jupyter notebook
 # - Sample image visualization with keypoints
 # - Data distribution analysis
 # - Train/validation/test split validation
+# - Comprehensive exploratory data analysis in both Japanese and English
 ```
 
 ### Training the Model
@@ -299,6 +303,11 @@ python -m pytest tests/test_data.py
 # Run additional test files
 python test_clearml_integration.py
 python test_config_loading.py
+python test_transforms.py
+python test_json_fix.py
+
+# Verify fixes and validate project state
+python verify_fixes.py
 
 # Run with coverage
 pip install pytest-cov
@@ -321,6 +330,11 @@ python -m pytest --cov=src tests/
 - Never commit API keys or credentials to the repository
 - Use environment variables or secure config files
 - Implement proper input validation in the web application
+
+#### Project Maintenance
+- Use `verify_fixes.py` to validate project state after changes
+- Run comprehensive test suite before deploying
+- Check `test_training.csv` for sample data format validation
 
 ### Contributing
 1. Fork the repository
@@ -511,6 +525,11 @@ python -m pytest tests/test_data.py
 # 追加のテストファイル実行
 python test_clearml_integration.py
 python test_config_loading.py
+python test_transforms.py
+python test_json_fix.py
+
+# 修正検証とプロジェクト状態の確認
+python verify_fixes.py
 ```
 
 ### 追加の考慮事項
