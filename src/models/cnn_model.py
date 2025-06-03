@@ -14,13 +14,14 @@ class BasicCNN(nn.Module):
     Basic CNN model for facial keypoints detection.
     """
     
-    def __init__(self, num_keypoints: int = 30, dropout_rate: float = 0.5):
+    def __init__(self, num_keypoints: int = 30, dropout_rate: float = 0.5, **kwargs):
         """
         Initialize the basic CNN model.
         
         Args:
             num_keypoints: Number of output keypoints (15 points * 2 coordinates = 30)
             dropout_rate: Dropout rate for regularization
+            **kwargs: Additional keyword arguments (ignored for compatibility)
         """
         super(BasicCNN, self).__init__()
         
@@ -236,13 +237,14 @@ class DeepCNN(nn.Module):
     Deeper CNN model with residual connections for facial keypoints detection.
     """
     
-    def __init__(self, num_keypoints: int = 30, dropout_rate: float = 0.5):
+    def __init__(self, num_keypoints: int = 30, dropout_rate: float = 0.5, **kwargs):
         """
         Initialize the deep CNN model.
         
         Args:
             num_keypoints: Number of output keypoints
             dropout_rate: Dropout rate for regularization
+            **kwargs: Additional keyword arguments (ignored for compatibility)
         """
         super(DeepCNN, self).__init__()
         
@@ -277,10 +279,11 @@ class DeepCNN(nn.Module):
         self.adaptive_pool = nn.AdaptiveAvgPool2d((1, 1))
         self.dropout = nn.Dropout(dropout_rate)
         
-        # Fully connected layers
-        self.fc1 = nn.Linear(512, 1024)
-        self.fc2 = nn.Linear(1024, 512)
-        self.fc3 = nn.Linear(512, num_keypoints)
+        # Fully connected layers - using larger hidden sizes to increase parameters
+        self.fc1 = nn.Linear(512, 2048)
+        self.fc2 = nn.Linear(2048, 1024)
+        self.fc3 = nn.Linear(1024, 512)
+        self.fc4 = nn.Linear(512, num_keypoints)
     
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -320,7 +323,9 @@ class DeepCNN(nn.Module):
         x = self.dropout(x)
         x = F.relu(self.fc2(x))
         x = self.dropout(x)
-        x = self.fc3(x)
+        x = F.relu(self.fc3(x))
+        x = self.dropout(x)
+        x = self.fc4(x)
         
         return x
 
