@@ -28,6 +28,10 @@ def parse_args():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(description='Train facial keypoints detection model')
     
+    # Config file argument
+    parser.add_argument('--config', type=str, default='config/training_config.yaml',
+                        help='Path to training configuration YAML file')
+    
     # Data arguments
     parser.add_argument('--data_path', type=str, required=True,
                         help='Path to the CSV file containing training data')
@@ -138,6 +142,15 @@ def create_loss_function(loss_type):
         raise ValueError(f"Unsupported loss function: {loss_type}")
 
 
+def load_config(config_path):
+    """Load training configuration from YAML file."""
+    if config_path and os.path.exists(config_path):
+        with open(config_path, 'r') as f:
+            config = yaml.safe_load(f)
+        return config
+    return None
+
+
 def load_clearml_config(config_path):
     """Load ClearML configuration from YAML file."""
     if config_path and os.path.exists(config_path):
@@ -147,9 +160,103 @@ def load_clearml_config(config_path):
     return None
 
 
+def update_args_from_config(args, config):
+    """Update argument values from config file."""
+    if config is None:
+        return args
+    
+    # Update data configuration
+    if 'data' in config:
+        data_config = config['data']
+        if 'val_split' in data_config:
+            args.val_split = data_config['val_split']
+        if 'test_split' in data_config:
+            args.test_split = data_config['test_split']
+        if 'image_size' in data_config:
+            args.image_size = data_config['image_size']
+        if 'handle_missing' in data_config:
+            args.handle_missing = data_config['handle_missing']
+    
+    # Update model configuration
+    if 'model' in config:
+        model_config = config['model']
+        if 'type' in model_config:
+            args.model_type = model_config['type']
+        if 'pretrained' in model_config:
+            args.pretrained = model_config['pretrained']
+        if 'dropout_rate' in model_config:
+            args.dropout_rate = model_config['dropout_rate']
+    
+    # Update training configuration
+    if 'training' in config:
+        training_config = config['training']
+        if 'epochs' in training_config:
+            args.epochs = training_config['epochs']
+        if 'batch_size' in training_config:
+            args.batch_size = training_config['batch_size']
+        if 'num_workers' in training_config:
+            args.num_workers = training_config['num_workers']
+        if 'mixed_precision' in training_config:
+            args.mixed_precision = training_config['mixed_precision']
+        if 'loss_function' in training_config:
+            args.loss_function = training_config['loss_function']
+        
+        # Update optimizer configuration
+        if 'optimizer' in training_config:
+            optimizer_config = training_config['optimizer']
+            if 'type' in optimizer_config:
+                args.optimizer = optimizer_config['type']
+            if 'learning_rate' in optimizer_config:
+                args.learning_rate = optimizer_config['learning_rate']
+        
+        # Update scheduler configuration
+        if 'scheduler' in training_config:
+            scheduler_config = training_config['scheduler']
+            if 'type' in scheduler_config:
+                args.scheduler = scheduler_config['type']
+            # Store scheduler config for later use
+            args.scheduler_config = scheduler_config
+    
+    # Update checkpoint configuration
+    if 'checkpoints' in config:
+        checkpoint_config = config['checkpoints']
+        if 'save_dir' in checkpoint_config:
+            args.save_dir = checkpoint_config['save_dir']
+        if 'save_frequency' in checkpoint_config:
+            args.save_frequency = checkpoint_config['save_frequency']
+        if 'resume_from' in checkpoint_config:
+            args.resume_from = checkpoint_config['resume_from']
+    
+    # Update ClearML configuration
+    if 'clearml' in config:
+        clearml_config = config['clearml']
+        if 'project_name' in clearml_config:
+            args.project_name = clearml_config['project_name']
+        if 'experiment_name' in clearml_config:
+            args.experiment_name = clearml_config['experiment_name']
+    
+    # Update hardware configuration
+    if 'hardware' in config:
+        hardware_config = config['hardware']
+        if 'device' in hardware_config:
+            args.device = hardware_config['device']
+        if 'seed' in hardware_config:
+            args.seed = hardware_config['seed']
+    
+    return args
+
+
 def main():
     """Main training function."""
     args = parse_args()
+    
+    # Load config file and update arguments
+    config = load_config(args.config)
+    if config:
+        print(f"Loading config from: {args.config}")
+        args = update_args_from_config(args, config)
+    else:
+        print(f"Config file not found: {args.config}. Using command line arguments and defaults.")
     
     # Set random seed
     set_seed(args.seed)
@@ -279,11 +386,13 @@ def main():
     # Create scheduler
     scheduler = None
     if args.scheduler == 'step':
+        step_size = getattr(args, 'scheduler_config', {}).get('step_size', 30)
+        gamma = getattr(args, 'scheduler_config', {}).get('gamma', 0.1)
         scheduler = create_scheduler(
             optimizer,
             scheduler_type='step',
-            step_size=30,
-            gamma=0.1
+            step_size=step_size,
+            gamma=gamma
         )
     elif args.scheduler == 'cosine':
         scheduler = create_scheduler(
@@ -292,11 +401,12 @@ def main():
             T_max=args.epochs
         )
     elif args.scheduler == 'plateau':
+        patience = getattr(args, 'scheduler_config', {}).get('patience', 10)
         scheduler = create_scheduler(
             optimizer,
             scheduler_type='plateau',
             mode='min',
-            patience=10,
+            patience=patience,
             factor=0.5
         )
     
