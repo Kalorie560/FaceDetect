@@ -268,13 +268,22 @@ def main():
     os.makedirs(args.save_dir, exist_ok=True)
     
     # Load ClearML config
-    clearml_config = load_clearml_config(args.clearml_config)
+    clearml_config = load_clearml_config(args.clearml_config or 'config/clearml.yaml')
     if clearml_config:
         clearml_config['project_name'] = args.project_name
         if args.experiment_name:
             clearml_config['task_name'] = args.experiment_name
         else:
             clearml_config['task_name'] = f"{args.model_type}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    else:
+        # Create default ClearML config if none found
+        clearml_config = {
+            'project_name': args.project_name,
+            'task_name': f"{args.model_type}_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+            'experiment': {
+                'tags': ['facial_keypoints', args.model_type, 'cnn']
+            }
+        }
     
     print("="*60)
     print("FACIAL KEYPOINTS DETECTION TRAINING")
@@ -410,6 +419,26 @@ def main():
             factor=0.5
         )
     
+    # Prepare training arguments for hyperparameter logging
+    training_args = {
+        'model_type': args.model_type,
+        'epochs': args.epochs,
+        'batch_size': args.batch_size,
+        'learning_rate': args.learning_rate,
+        'optimizer': args.optimizer,
+        'scheduler': args.scheduler,
+        'loss_function': args.loss_function,
+        'image_size': args.image_size,
+        'pretrained': args.pretrained,
+        'dropout_rate': args.dropout_rate,
+        'val_split': args.val_split,
+        'test_split': args.test_split,
+        'handle_missing': args.handle_missing,
+        'device': device,
+        'seed': args.seed,
+        'mixed_precision': args.mixed_precision
+    }
+    
     # Create trainer
     trainer = FacialKeypointsTrainer(
         model=model,
@@ -420,7 +449,8 @@ def main():
         scheduler=scheduler,
         device=device,
         clearml_config=clearml_config,
-        save_dir=args.save_dir
+        save_dir=args.save_dir,
+        training_args=training_args
     )
     
     # Train model

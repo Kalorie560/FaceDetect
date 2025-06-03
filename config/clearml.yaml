@@ -19,12 +19,34 @@ clearml:
       - "cnn"
       - "computer_vision"
       - "kaggle"
+      - "pytorch"
     
     # Auto-logging configuration
     auto_logging:
       frameworks: true
       matplotlib: true
       tensorboard: false
+      pytorch: true
+      
+    # Logging frequency
+    logging:
+      batch_frequency: 10  # Log every 10 batches
+      sample_frequency: 10  # Log sample predictions every 10 epochs
       
     # Output URI for artifacts
     output_uri: "s3://your-bucket/experiments/"  # Optional: configure for cloud storage
+    
+  # Metrics to track
+  metrics:
+    - train_loss
+    - val_loss
+    - learning_rate
+    - test_loss
+    - mse
+    - mae
+    
+  # Model artifacts to save
+  artifacts:
+    - best_model
+    - training_history_plot
+    - sample_predictions

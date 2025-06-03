@@ -32,7 +32,8 @@ class FacialKeypointsTrainer:
         scheduler: Optional[optim.lr_scheduler._LRScheduler] = None,
         device: str = 'cuda',
         clearml_config: Optional[Dict[str, Any]] = None,
-        save_dir: str = './checkpoints'
+        save_dir: str = './checkpoints',
+        training_args: Optional[Dict[str, Any]] = None
     ):
         """
         Initialize the trainer.
@@ -47,6 +48,7 @@ class FacialKeypointsTrainer:
             device: Device to train on
             clearml_config: ClearML configuration
             save_dir: Directory to save checkpoints
+            training_args: Training arguments for hyperparameter logging
         """
         self.model = model.to(device)
         self.train_loader = train_loader
@@ -56,6 +58,7 @@ class FacialKeypointsTrainer:
         self.scheduler = scheduler
         self.device = device
         self.save_dir = save_dir
+        self._training_args = training_args
         
         # Create save directory
         os.makedirs(save_dir, exist_ok=True)
@@ -80,19 +83,30 @@ class FacialKeypointsTrainer:
     def _init_clearml(self, config: Dict[str, Any]):
         """Initialize ClearML task and logger."""
         try:
+            # Extract experiment configuration
+            experiment_config = config.get('experiment', {})
+            
             self.clearml_task = Task.init(
                 project_name=config.get('project_name', 'facial_keypoints_detection'),
                 task_name=config.get('task_name', f'training_{datetime.now().strftime("%Y%m%d_%H%M%S")}'),
-                tags=config.get('tags', ['facial_keypoints', 'cnn'])
+                tags=experiment_config.get('tags', ['facial_keypoints', 'cnn'])
             )
             self.clearml_logger = self.clearml_task.get_logger()
             
             # Log configuration
             self.clearml_task.connect_configuration(config)
             
+            # Log model hyperparameters if available
+            if hasattr(self, '_training_args'):
+                self.clearml_task.connect(self._training_args)
+            
             print("ClearML initialized successfully")
+            print(f"Project: {config.get('project_name', 'facial_keypoints_detection')}")
+            print(f"Task: {config.get('task_name', 'training')}")
+            
         except Exception as e:
             print(f"Warning: Could not initialize ClearML: {e}")
+            print("Training will continue without ClearML logging")
             self.clearml_task = None
             self.clearml_logger = None
     
@@ -138,11 +152,18 @@ class FacialKeypointsTrainer:
             
             # Log to ClearML
             if self.clearml_logger and batch_idx % 10 == 0:
+                global_step = epoch * num_batches + batch_idx
                 self.clearml_logger.report_scalar(
                     'train',
                     'batch_loss',
                     value=loss.item(),
-                    iteration=epoch * num_batches + batch_idx
+                    iteration=global_step
+                )
+                self.clearml_logger.report_scalar(
+                    'train',
+                    'learning_rate',
+                    value=self.optimizer.param_groups[0]['lr'],
+                    iteration=global_step
                 )
         
         return total_loss / num_batches
@@ -287,6 +308,14 @@ class FacialKeypointsTrainer:
                 self.clearml_logger.report_scalar('epoch', 'val_loss', value=val_loss, iteration=epoch)
                 self.clearml_logger.report_scalar('epoch', 'learning_rate', 
                                                  value=self.optimizer.param_groups[0]['lr'], iteration=epoch)
+                
+                # Log sample predictions every 10 epochs
+                if (epoch + 1) % 10 == 0:
+                    self.log_sample_predictions(epoch)
+                
+                # Log model artifacts when best model is saved
+                if is_best:
+                    self.log_model_artifacts(epoch)
             
             # Save checkpoint
             if (epoch + 1) % save_frequency == 0 or is_best:
@@ -393,7 +422,125 @@ class FacialKeypointsTrainer:
             'per_keypoint_mae': per_keypoint_mae.tolist()
         }
         
+        # Log test metrics to ClearML
+        if self.clearml_logger:
+            self.clearml_logger.report_scalar('test', 'test_loss', value=avg_loss, iteration=0)
+            self.clearml_logger.report_scalar('test', 'mse', value=mse, iteration=0)
+            self.clearml_logger.report_scalar('test', 'mae', value=mae, iteration=0)
+            
+            # Log per-keypoint metrics as a histogram
+            self.clearml_logger.report_histogram(
+                title='Per-Keypoint MSE',
+                series='test',
+                values=per_keypoint_mse,
+                iteration=0
+            )
+            self.clearml_logger.report_histogram(
+                title='Per-Keypoint MAE', 
+                series='test',
+                values=per_keypoint_mae,
+                iteration=0
+            )
+        
         return metrics
+    
+    def log_sample_predictions(self, epoch: int, num_samples: int = 4):
+        """
+        Log sample predictions to ClearML for visualization.
+        
+        Args:
+            epoch: Current epoch number
+            num_samples: Number of samples to log
+        """
+        if not self.clearml_logger:
+            return
+        
+        self.model.eval()
+        with torch.no_grad():
+            # Get a batch from validation set
+            batch = next(iter(self.val_loader))
+            images = batch['image'][:num_samples].to(self.device)
+            keypoints = batch['keypoints'][:num_samples].to(self.device)
+            
+            # Get predictions
+            predictions = self.model(images)
+            
+            # Convert to numpy and denormalize if needed
+            images_np = images.cpu().numpy()
+            keypoints_np = keypoints.cpu().numpy()
+            predictions_np = predictions.cpu().numpy()
+            
+            # Create visualization for each sample
+            for i in range(num_samples):
+                fig, axes = plt.subplots(1, 2, figsize=(12, 6))
+                
+                # Original image with ground truth keypoints
+                img = images_np[i].transpose(1, 2, 0)
+                if img.shape[2] == 1:
+                    img = img.squeeze(2)
+                    axes[0].imshow(img, cmap='gray')
+                else:
+                    axes[0].imshow(img)
+                
+                # Plot ground truth keypoints
+                gt_points = keypoints_np[i].reshape(-1, 2)
+                axes[0].scatter(gt_points[:, 0], gt_points[:, 1], c='red', s=20, marker='o')
+                axes[0].set_title('Ground Truth')
+                axes[0].axis('off')
+                
+                # Same image with predictions
+                if img.shape[2] == 1 if len(img.shape) == 3 else False:
+                    axes[1].imshow(img, cmap='gray')
+                else:
+                    axes[1].imshow(img)
+                
+                # Plot predicted keypoints
+                pred_points = predictions_np[i].reshape(-1, 2)
+                axes[1].scatter(pred_points[:, 0], pred_points[:, 1], c='blue', s=20, marker='x')
+                axes[1].set_title('Predictions')
+                axes[1].axis('off')
+                
+                plt.tight_layout()
+                
+                # Log to ClearML
+                self.clearml_logger.report_matplotlib_figure(
+                    title=f"Sample Predictions Epoch {epoch+1}",
+                    series=f"sample_{i+1}",
+                    figure=fig,
+                    iteration=epoch
+                )
+                
+                plt.close(fig)
+    
+    def log_model_artifacts(self, epoch: int):
+        """
+        Log model artifacts to ClearML.
+        
+        Args:
+            epoch: Current epoch number
+        """
+        if not self.clearml_task:
+            return
+        
+        try:
+            # Save and upload best model
+            best_model_path = os.path.join(self.save_dir, 'best_model.pth')
+            if os.path.exists(best_model_path):
+                self.clearml_task.upload_artifact(
+                    name=f'best_model_epoch_{epoch+1}',
+                    artifact_object=best_model_path
+                )
+            
+            # Upload training history plot if it exists
+            history_plot_path = os.path.join(self.save_dir, 'training_history.png')
+            if os.path.exists(history_plot_path):
+                self.clearml_task.upload_artifact(
+                    name='training_history_plot',
+                    artifact_object=history_plot_path
+                )
+            
+        except Exception as e:
+            print(f"Warning: Could not upload artifacts to ClearML: {e}")
 
 
 def create_optimizer(
