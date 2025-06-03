@@ -415,9 +415,9 @@ class FacialKeypointsTrainer:
         per_keypoint_mae = np.mean(np.abs(all_predictions - all_targets), axis=0)
         
         metrics = {
-            'test_loss': avg_loss,
-            'mse': mse,
-            'mae': mae,
+            'test_loss': float(avg_loss),
+            'mse': float(mse),
+            'mae': float(mae),
             'per_keypoint_mse': per_keypoint_mse.tolist(),
             'per_keypoint_mae': per_keypoint_mae.tolist()
         }
