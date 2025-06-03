@@ -22,7 +22,7 @@ class FacialKeypointsDataset(Dataset):
     
     def __init__(
         self,
-        csv_file: str,
+        csv_file: Optional[str] = None,
         transform: Optional[Callable] = None,
         augmentation: Optional[Callable] = None,
         handle_missing: str = 'drop',
@@ -32,30 +32,36 @@ class FacialKeypointsDataset(Dataset):
         Initialize the dataset.
         
         Args:
-            csv_file: Path to the CSV file containing image data and keypoints
+            csv_file: Path to the CSV file containing image data and keypoints (optional)
             transform: Transform to apply to images
             augmentation: Augmentation to apply to both images and keypoints
             handle_missing: How to handle missing keypoints ('drop', 'interpolate', 'zero')
             image_size: Target size for images (height, width)
         """
-        self.data = pd.read_csv(csv_file)
+        if csv_file is not None:
+            self.data = pd.read_csv(csv_file)
+        else:
+            self.data = None
         self.transform = transform
         self.augmentation = augmentation
         self.image_size = image_size
         
-        # Handle missing values
-        if handle_missing == 'drop':
-            self.data = self.data.dropna()
-        elif handle_missing == 'interpolate':
-            self.data = self._interpolate_missing()
-        elif handle_missing == 'zero':
-            self.data = self.data.fillna(0)
-        
-        # Extract keypoint column names
-        self.keypoint_cols = [col for col in self.data.columns if col != 'Image']
-        
-        # Reset index after potential dropping
-        self.data = self.data.reset_index(drop=True)
+        # Handle missing values only if data is loaded
+        if self.data is not None:
+            if handle_missing == 'drop':
+                self.data = self.data.dropna()
+            elif handle_missing == 'interpolate':
+                self.data = self._interpolate_missing()
+            elif handle_missing == 'zero':
+                self.data = self.data.fillna(0)
+            
+            # Extract keypoint column names
+            self.keypoint_cols = [col for col in self.data.columns if col != 'Image']
+            
+            # Reset index after potential dropping
+            self.data = self.data.reset_index(drop=True)
+        else:
+            self.keypoint_cols = []
         
     def _interpolate_missing(self) -> pd.DataFrame:
         """Interpolate missing keypoint values using available data."""
@@ -109,7 +115,9 @@ class FacialKeypointsDataset(Dataset):
     
     def __len__(self) -> int:
         """Return the number of samples in the dataset."""
-        return len(self.data)
+        if self.data is not None:
+            return len(self.data)
+        return 0
     
     def __getitem__(self, idx: int) -> Dict[str, torch.Tensor]:
         """
@@ -121,6 +129,9 @@ class FacialKeypointsDataset(Dataset):
         Returns:
             Dictionary containing 'image' and 'keypoints' tensors
         """
+        if self.data is None:
+            raise RuntimeError("Dataset data is not loaded. Either provide csv_file or set data manually.")
+        
         row = self.data.iloc[idx]
         
         # Parse image
