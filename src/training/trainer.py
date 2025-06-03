@@ -273,4 +273,178 @@ class FacialKeypointsTrainer:
             # Update history
             self.history['train_loss'].append(train_loss)
             self.history['val_loss'].append(val_loss)
-            self.history['learning_rate'].append(self.optimizer.param_groups[0]['lr'])\n            \n            # Check if this is the best model\n            is_best = val_loss < self.best_val_loss\n            if is_best:\n                self.best_val_loss = val_loss\n                self.best_epoch = epoch\n            \n            # Log to ClearML\n            if self.clearml_logger:\n                self.clearml_logger.report_scalar('epoch', 'train_loss', value=train_loss, iteration=epoch)\n                self.clearml_logger.report_scalar('epoch', 'val_loss', value=val_loss, iteration=epoch)\n                self.clearml_logger.report_scalar('epoch', 'learning_rate', \n                                                 value=self.optimizer.param_groups[0]['lr'], iteration=epoch)\n            \n            # Save checkpoint\n            if (epoch + 1) % save_frequency == 0 or is_best:\n                self.save_checkpoint(epoch, val_loss, is_best)\n            \n            # Print epoch summary\n            print(f\"Epoch {epoch+1}/{num_epochs}:\")\n            print(f\"  Train Loss: {train_loss:.6f}\")\n            print(f\"  Val Loss: {val_loss:.6f}\")\n            print(f\"  LR: {self.optimizer.param_groups[0]['lr']:.2e}\")\n            if is_best:\n                print(f\"  *** New best model! ***\")\n            print()\n        \n        print(f\"Training completed! Best validation loss: {self.best_val_loss:.6f} at epoch {self.best_epoch + 1}\")\n        \n        return self.history\n    \n    def plot_training_history(self, save_path: Optional[str] = None):\n        \"\"\"\n        Plot training history.\n        \n        Args:\n            save_path: Path to save the plot\n        \"\"\"\n        if not self.history['train_loss']:\n            print(\"No training history to plot\")\n            return\n        \n        fig, axes = plt.subplots(1, 2, figsize=(15, 5))\n        \n        # Plot losses\n        epochs = range(1, len(self.history['train_loss']) + 1)\n        axes[0].plot(epochs, self.history['train_loss'], label='Train Loss', marker='o')\n        axes[0].plot(epochs, self.history['val_loss'], label='Val Loss', marker='s')\n        axes[0].set_xlabel('Epoch')\n        axes[0].set_ylabel('Loss')\n        axes[0].set_title('Training and Validation Loss')\n        axes[0].legend()\n        axes[0].grid(True)\n        \n        # Plot learning rate\n        axes[1].plot(epochs, self.history['learning_rate'], label='Learning Rate', marker='d', color='orange')\n        axes[1].set_xlabel('Epoch')\n        axes[1].set_ylabel('Learning Rate')\n        axes[1].set_title('Learning Rate Schedule')\n        axes[1].set_yscale('log')\n        axes[1].legend()\n        axes[1].grid(True)\n        \n        plt.tight_layout()\n        \n        if save_path:\n            plt.savefig(save_path, dpi=300, bbox_inches='tight')\n            print(f\"Training history plot saved to {save_path}\")\n        \n        plt.show()\n    \n    def evaluate_model(self, test_loader: DataLoader) -> Dict[str, float]:\n        \"\"\"\n        Evaluate model on test set.\n        \n        Args:\n            test_loader: Test data loader\n            \n        Returns:\n            Evaluation metrics\n        \"\"\"\n        self.model.eval()\n        total_loss = 0.0\n        all_predictions = []\n        all_targets = []\n        \n        with torch.no_grad():\n            for batch in tqdm(test_loader, desc='Evaluating'):\n                images = batch['image'].to(self.device)\n                keypoints = batch['keypoints'].to(self.device)\n                \n                outputs = self.model(images)\n                loss = self.criterion(outputs, keypoints)\n                \n                total_loss += loss.item()\n                all_predictions.append(outputs.cpu().numpy())\n                all_targets.append(keypoints.cpu().numpy())\n        \n        # Concatenate all predictions and targets\n        all_predictions = np.concatenate(all_predictions, axis=0)\n        all_targets = np.concatenate(all_targets, axis=0)\n        \n        # Calculate metrics\n        avg_loss = total_loss / len(test_loader)\n        mse = np.mean((all_predictions - all_targets) ** 2)\n        mae = np.mean(np.abs(all_predictions - all_targets))\n        \n        # Calculate per-keypoint metrics\n        per_keypoint_mse = np.mean((all_predictions - all_targets) ** 2, axis=0)\n        per_keypoint_mae = np.mean(np.abs(all_predictions - all_targets), axis=0)\n        \n        metrics = {\n            'test_loss': avg_loss,\n            'mse': mse,\n            'mae': mae,\n            'per_keypoint_mse': per_keypoint_mse.tolist(),\n            'per_keypoint_mae': per_keypoint_mae.tolist()\n        }\n        \n        return metrics\n\n\ndef create_optimizer(\n    model: nn.Module,\n    optimizer_type: str = 'adam',\n    learning_rate: float = 0.001,\n    **kwargs\n) -> optim.Optimizer:\n    \"\"\"\n    Create optimizer for training.\n    \n    Args:\n        model: PyTorch model\n        optimizer_type: Type of optimizer ('adam', 'sgd', 'adamw')\n        learning_rate: Learning rate\n        **kwargs: Additional optimizer arguments\n        \n    Returns:\n        Optimizer instance\n    \"\"\"\n    if optimizer_type.lower() == 'adam':\n        return optim.Adam(model.parameters(), lr=learning_rate, **kwargs)\n    elif optimizer_type.lower() == 'sgd':\n        return optim.SGD(model.parameters(), lr=learning_rate, **kwargs)\n    elif optimizer_type.lower() == 'adamw':\n        return optim.AdamW(model.parameters(), lr=learning_rate, **kwargs)\n    else:\n        raise ValueError(f\"Unsupported optimizer type: {optimizer_type}\")\n\n\ndef create_scheduler(\n    optimizer: optim.Optimizer,\n    scheduler_type: str = 'step',\n    **kwargs\n) -> optim.lr_scheduler._LRScheduler:\n    \"\"\"\n    Create learning rate scheduler.\n    \n    Args:\n        optimizer: Optimizer instance\n        scheduler_type: Type of scheduler ('step', 'cosine', 'plateau')\n        **kwargs: Additional scheduler arguments\n        \n    Returns:\n        Scheduler instance\n    \"\"\"\n    if scheduler_type.lower() == 'step':\n        return optim.lr_scheduler.StepLR(optimizer, **kwargs)\n    elif scheduler_type.lower() == 'cosine':\n        return optim.lr_scheduler.CosineAnnealingLR(optimizer, **kwargs)\n    elif scheduler_type.lower() == 'plateau':\n        return optim.lr_scheduler.ReduceLROnPlateau(optimizer, **kwargs)\n    else:\n        raise ValueError(f\"Unsupported scheduler type: {scheduler_type}\")
+            self.history['learning_rate'].append(self.optimizer.param_groups[0]['lr'])
+            
+            # Check if this is the best model
+            is_best = val_loss < self.best_val_loss
+            if is_best:
+                self.best_val_loss = val_loss
+                self.best_epoch = epoch
+            
+            # Log to ClearML
+            if self.clearml_logger:
+                self.clearml_logger.report_scalar('epoch', 'train_loss', value=train_loss, iteration=epoch)
+                self.clearml_logger.report_scalar('epoch', 'val_loss', value=val_loss, iteration=epoch)
+                self.clearml_logger.report_scalar('epoch', 'learning_rate', 
+                                                 value=self.optimizer.param_groups[0]['lr'], iteration=epoch)
+            
+            # Save checkpoint
+            if (epoch + 1) % save_frequency == 0 or is_best:
+                self.save_checkpoint(epoch, val_loss, is_best)
+            
+            # Print epoch summary
+            print(f"Epoch {epoch+1}/{num_epochs}:")
+            print(f"  Train Loss: {train_loss:.6f}")
+            print(f"  Val Loss: {val_loss:.6f}")
+            print(f"  LR: {self.optimizer.param_groups[0]['lr']:.2e}")
+            if is_best:
+                print(f"  *** New best model! ***")
+            print()
+        
+        print(f"Training completed! Best validation loss: {self.best_val_loss:.6f} at epoch {self.best_epoch + 1}")
+        
+        return self.history
+    
+    def plot_training_history(self, save_path: Optional[str] = None):
+        """
+        Plot training history.
+        
+        Args:
+            save_path: Path to save the plot
+        """
+        if not self.history['train_loss']:
+            print("No training history to plot")
+            return
+        
+        fig, axes = plt.subplots(1, 2, figsize=(15, 5))
+        
+        # Plot losses
+        epochs = range(1, len(self.history['train_loss']) + 1)
+        axes[0].plot(epochs, self.history['train_loss'], label='Train Loss', marker='o')
+        axes[0].plot(epochs, self.history['val_loss'], label='Val Loss', marker='s')
+        axes[0].set_xlabel('Epoch')
+        axes[0].set_ylabel('Loss')
+        axes[0].set_title('Training and Validation Loss')
+        axes[0].legend()
+        axes[0].grid(True)
+        
+        # Plot learning rate
+        axes[1].plot(epochs, self.history['learning_rate'], label='Learning Rate', marker='d', color='orange')
+        axes[1].set_xlabel('Epoch')
+        axes[1].set_ylabel('Learning Rate')
+        axes[1].set_title('Learning Rate Schedule')
+        axes[1].set_yscale('log')
+        axes[1].legend()
+        axes[1].grid(True)
+        
+        plt.tight_layout()
+        
+        if save_path:
+            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+            print(f"Training history plot saved to {save_path}")
+        
+        plt.show()
+    
+    def evaluate_model(self, test_loader: DataLoader) -> Dict[str, float]:
+        """
+        Evaluate model on test set.
+        
+        Args:
+            test_loader: Test data loader
+            
+        Returns:
+            Evaluation metrics
+        """
+        self.model.eval()
+        total_loss = 0.0
+        all_predictions = []
+        all_targets = []
+        
+        with torch.no_grad():
+            for batch in tqdm(test_loader, desc='Evaluating'):
+                images = batch['image'].to(self.device)
+                keypoints = batch['keypoints'].to(self.device)
+                
+                outputs = self.model(images)
+                loss = self.criterion(outputs, keypoints)
+                
+                total_loss += loss.item()
+                all_predictions.append(outputs.cpu().numpy())
+                all_targets.append(keypoints.cpu().numpy())
+        
+        # Concatenate all predictions and targets
+        all_predictions = np.concatenate(all_predictions, axis=0)
+        all_targets = np.concatenate(all_targets, axis=0)
+        
+        # Calculate metrics
+        avg_loss = total_loss / len(test_loader)
+        mse = np.mean((all_predictions - all_targets) ** 2)
+        mae = np.mean(np.abs(all_predictions - all_targets))
+        
+        # Calculate per-keypoint metrics
+        per_keypoint_mse = np.mean((all_predictions - all_targets) ** 2, axis=0)
+        per_keypoint_mae = np.mean(np.abs(all_predictions - all_targets), axis=0)
+        
+        metrics = {
+            'test_loss': avg_loss,
+            'mse': mse,
+            'mae': mae,
+            'per_keypoint_mse': per_keypoint_mse.tolist(),
+            'per_keypoint_mae': per_keypoint_mae.tolist()
+        }
+        
+        return metrics
+
+
+def create_optimizer(
+    model: nn.Module,
+    optimizer_type: str = 'adam',
+    learning_rate: float = 0.001,
+    **kwargs
+) -> optim.Optimizer:
+    """
+    Create optimizer for training.
+    
+    Args:
+        model: PyTorch model
+        optimizer_type: Type of optimizer ('adam', 'sgd', 'adamw')
+        learning_rate: Learning rate
+        **kwargs: Additional optimizer arguments
+        
+    Returns:
+        Optimizer instance
+    """
+    if optimizer_type.lower() == 'adam':
+        return optim.Adam(model.parameters(), lr=learning_rate, **kwargs)
+    elif optimizer_type.lower() == 'sgd':
+        return optim.SGD(model.parameters(), lr=learning_rate, **kwargs)
+    elif optimizer_type.lower() == 'adamw':
+        return optim.AdamW(model.parameters(), lr=learning_rate, **kwargs)
+    else:
+        raise ValueError(f"Unsupported optimizer type: {optimizer_type}")
+
+
+def create_scheduler(
+    optimizer: optim.Optimizer,
+    scheduler_type: str = 'step',
+    **kwargs
+) -> optim.lr_scheduler._LRScheduler:
+    """
+    Create learning rate scheduler.
+    
+    Args:
+        optimizer: Optimizer instance
+        scheduler_type: Type of scheduler ('step', 'cosine', 'plateau')
+        **kwargs: Additional scheduler arguments
+        
+    Returns:
+        Scheduler instance
+    """
+    if scheduler_type.lower() == 'step':
+        return optim.lr_scheduler.StepLR(optimizer, **kwargs)
+    elif scheduler_type.lower() == 'cosine':
+        return optim.lr_scheduler.CosineAnnealingLR(optimizer, **kwargs)
+    elif scheduler_type.lower() == 'plateau':
+        return optim.lr_scheduler.ReduceLROnPlateau(optimizer, **kwargs)
+    else:
+        raise ValueError(f"Unsupported scheduler type: {scheduler_type}")
