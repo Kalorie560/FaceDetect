@@ -11,16 +11,17 @@ This project implements a comprehensive solution for the Kaggle Facial Keypoints
 
 ### Key Features
 - **Multiple CNN Architectures**: BasicCNN, DeepCNN, ResNet-based, and EfficientNet-based models
-- **Data Augmentation**: Robust preprocessing with rotation, scaling, brightness adjustments, and noise
+- **Data Augmentation**: Robust preprocessing with rotation, scaling, brightness adjustments, and noise using Albumentations and imgaug
 - **Experiment Tracking**: ClearML integration for monitoring training progress and metrics
-- **Web Application**: Interactive Streamlit app for real-time keypoint detection
-- **Comprehensive Testing**: Unit tests for models and data processing pipelines
+- **Web Application**: Interactive Streamlit app with enhanced UI components for real-time keypoint detection
+- **Comprehensive Testing**: Unit tests, integration tests, and automated test runner
 - **Bilingual Support**: Both Japanese and English interfaces
+- **Data Exploration**: Jupyter notebook for dataset analysis and visualization
+- **Configuration Management**: YAML-based configuration for flexible experiment setup
 
 ### Project Structure
 ```
 FaceDetect/
-├── .github/workflows/     # GitHub Actions configuration
 ├── src/                   # Source code
 │   ├── data/             # Data processing modules
 │   │   ├── dataset.py    # Dataset class with augmentation support
@@ -36,11 +37,18 @@ FaceDetect/
 ├── webapp/               # Streamlit web application
 │   └── app.py           # Main web app with bilingual interface
 ├── config/               # Configuration files
-│   └── clearml.yaml     # ClearML configuration template
+│   ├── clearml.yaml     # ClearML configuration template
+│   └── training_config.yaml # Training configuration template
 ├── notebooks/            # Jupyter notebooks for experiments
+│   └── data_exploration.ipynb # Data exploration and analysis
 ├── tests/                # Unit tests
 │   ├── test_models.py   # Model architecture tests
 │   └── test_data.py     # Data processing tests
+├── run_tests.py          # Integrated test runner script
+├── test_clearml_integration.py # ClearML integration tests
+├── test_config_loading.py     # Configuration loading tests
+├── test_fix.py           # Additional test utilities
+├── test_training.csv     # Sample training data for testing
 ├── requirements.txt      # Python dependencies
 └── README.md            # This file
 ```
@@ -119,7 +127,9 @@ source venv/bin/activate  # On Windows: venv\\Scripts\\activate
 pip install -r requirements.txt
 ```
 
-#### 2. ClearML Configuration
+#### 2. Configuration Setup
+
+##### ClearML Configuration
 ```bash
 # Copy and edit the ClearML configuration
 cp config/clearml.yaml config/clearml_local.yaml
@@ -128,6 +138,19 @@ cp config/clearml.yaml config/clearml_local.yaml
 # - Replace YOUR_ACCESS_KEY_HERE with your ClearML access key
 # - Replace YOUR_SECRET_KEY_HERE with your ClearML secret key
 # - Replace YOUR_WORKSPACE_NAME with your workspace name
+```
+
+##### Training Configuration
+```bash
+# The training_config.yaml file provides comprehensive training settings
+# You can modify parameters such as:
+# - Model type (resnet18, efficientnet_b0, etc.)
+# - Training hyperparameters (epochs, batch_size, learning_rate)
+# - Data processing options (augmentation, missing value handling)
+# - Hardware settings (device, mixed precision)
+
+# Copy and customize for your experiments
+cp config/training_config.yaml config/my_training_config.yaml
 ```
 
 #### 3. Data Preparation
@@ -159,7 +182,31 @@ ls -la *.csv
 # - 30 keypoint coordinate columns
 ```
 
+### Data Exploration
+
+Before training, you can explore the dataset using the provided Jupyter notebook:
+
+```bash
+# Start Jupyter notebook
+jupyter notebook
+
+# Open notebooks/data_exploration.ipynb
+# This notebook provides:
+# - Dataset statistics and visualization
+# - Missing value analysis
+# - Sample image visualization with keypoints
+# - Data distribution analysis
+# - Train/validation/test split validation
+```
+
 ### Training the Model
+
+#### Configuration-based Training
+```bash
+# Use the training configuration file for comprehensive setup
+python src/training/train.py \
+    --config config/training_config.yaml
+```
 
 #### Basic Training
 ```bash
@@ -228,13 +275,30 @@ streamlit run webapp/app.py
 
 ### Testing
 
+#### Quick Test Runner
 ```bash
-# Run all tests
+# Run the integrated test suite
+python run_tests.py
+
+# This script performs:
+# - Python syntax validation
+# - Module import tests
+# - Unit tests with pytest (if available)
+# - Requirements validation
+```
+
+#### Detailed Testing
+```bash
+# Run all tests with pytest
 python -m pytest tests/
 
 # Run specific test modules
 python -m pytest tests/test_models.py
 python -m pytest tests/test_data.py
+
+# Run additional test files
+python test_clearml_integration.py
+python test_config_loading.py
 
 # Run with coverage
 pip install pytest-cov
@@ -276,11 +340,13 @@ This project is open source and available under the MIT License.
 
 ### 主要機能
 - **複数のCNNアーキテクチャ**: BasicCNN、DeepCNN、ResNetベース、EfficientNetベースモデル
-- **データ拡張**: 回転、スケーリング、明度調整、ノイズを含む堅牢な前処理
+- **データ拡張**: Albumentationsとimgaugによる回転、スケーリング、明度調整、ノイズを含む堅牢な前処理
 - **実験追跡**: 学習進行とメトリクスの監視のためのClearML統合
-- **Webアプリケーション**: リアルタイム特徴点検出のためのインタラクティブなStreamlitアプリ
-- **包括的テスト**: モデルとデータ処理パイプラインのユニットテスト
+- **Webアプリケーション**: 強化されたUIコンポーネントを持つリアルタイム特徴点検出のためのインタラクティブなStreamlitアプリ
+- **包括的テスト**: ユニットテスト、統合テスト、自動テストランナー
 - **バイリンガルサポート**: 日本語と英語の両方のインターフェース
+- **データ探索**: データセット分析と可視化のためのJupyterノートブック
+- **設定管理**: 柔軟な実験設定のためのYAMLベース設定
 
 ### データ前処理の詳細
 
@@ -421,13 +487,30 @@ streamlit run webapp/app.py
 
 ### テスト実行
 
+#### 統合テストランナー
 ```bash
-# すべてのテストを実行
+# 統合テストスイートを実行
+python run_tests.py
+
+# このスクリプトは以下を実行します:
+# - Python構文の検証
+# - モジュールインポートテスト
+# - ユニットテスト（pytestが利用可能な場合）
+# - 依存関係の検証
+```
+
+#### 詳細テスト
+```bash
+# pytestでテスト実行
 python -m pytest tests/
 
 # 特定のテストモジュールを実行
 python -m pytest tests/test_models.py
 python -m pytest tests/test_data.py
+
+# 追加のテストファイル実行
+python test_clearml_integration.py
+python test_config_loading.py
 ```
 
 ### 追加の考慮事項
