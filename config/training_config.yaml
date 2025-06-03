@@ -1,0 +1,59 @@
+# Training configuration example
+# Copy this file and modify for your experiments
+
+# Data configuration
+data:
+  csv_file: "training.csv"
+  image_size: [96, 96]
+  val_split: 0.2
+  test_split: 0.1
+  handle_missing: "drop"  # "drop", "interpolate", "zero"
+
+# Model configuration
+model:
+  type: "resnet18"  # "basic_cnn", "deep_cnn", "resnet18", "resnet34", "resnet50", "efficientnet_b0", "efficientnet_b2"
+  pretrained: true
+  dropout_rate: 0.5
+  num_keypoints: 30
+
+# Training configuration
+training:
+  epochs: 100
+  batch_size: 32
+  num_workers: 4
+  mixed_precision: false
+  
+  # Loss function
+  loss_function: "mse"  # "mse", "l1", "smooth_l1"
+  
+  # Optimizer
+  optimizer:
+    type: "adam"  # "adam", "sgd", "adamw"
+    learning_rate: 0.001
+    weight_decay: 0.0001
+  
+  # Learning rate scheduler
+  scheduler:
+    type: "step"  # "step", "cosine", "plateau"
+    step_size: 30
+    gamma: 0.1
+    patience: 10  # for plateau scheduler
+
+# Checkpoint configuration
+checkpoints:
+  save_dir: "./checkpoints"
+  save_frequency: 5
+  resume_from: null
+
+# ClearML configuration
+clearml:
+  enabled: true
+  config_file: "config/clearml_local.yaml"
+  project_name: "facial_keypoints_detection"
+  experiment_name: null  # Auto-generated if null
+  tags: ["facial_keypoints", "cnn", "computer_vision"]
+
+# Hardware configuration
+hardware:
+  device: "auto"  # "auto", "cuda", "cpu"
+  seed: 42

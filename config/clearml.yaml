@@ -1,0 +1,31 @@
+clearml:
+  api:
+    api_server: https://api.clear.ml
+    web_server: https://app.clear.ml
+    files_server: https://files.clear.ml
+    credentials:
+      # Replace with your actual ClearML credentials
+      access_key: YOUR_ACCESS_KEY_HERE
+      secret_key: YOUR_SECRET_KEY_HERE
+  
+  # Project configuration
+  project_name: "facial_keypoints_detection"
+  workspace: "YOUR_WORKSPACE_NAME"
+  
+  # Experiment configuration
+  experiment:
+    base_task_name: "facial_keypoints_training"
+    tags:
+      - "facial_keypoints"
+      - "cnn"
+      - "computer_vision"
+      - "kaggle"
+    
+    # Auto-logging configuration
+    auto_logging:
+      frameworks: true
+      matplotlib: true
+      tensorboard: false
+      
+    # Output URI for artifacts
+    output_uri: "s3://your-bucket/experiments/"  # Optional: configure for cloud storage
