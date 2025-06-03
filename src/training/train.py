@@ -70,7 +70,7 @@ def parse_args():
     parser.add_argument('--handle_missing', type=str, default='drop',
                         choices=['drop', 'interpolate', 'zero'],
                         help='How to handle missing keypoints')
-    parser.add_argument('--num_workers', type=int, default=4,
+    parser.add_argument('--num_workers', type=int, default=2,
                         help='Number of data loader workers')
     
     # Checkpoint arguments
@@ -207,7 +207,7 @@ def main():
         handle_missing=args.handle_missing,
         image_size=tuple(args.image_size)
     )
-    train_dataset.data = train_df.reset_index(drop=True)
+    train_dataset.set_data(train_df)
     
     val_dataset = FacialKeypointsDataset(
         csv_file=None,
@@ -215,7 +215,7 @@ def main():
         handle_missing=args.handle_missing,
         image_size=tuple(args.image_size)
     )
-    val_dataset.data = val_df.reset_index(drop=True)
+    val_dataset.set_data(val_df)
     
     test_dataset = FacialKeypointsDataset(
         csv_file=None,
@@ -223,7 +223,7 @@ def main():
         handle_missing=args.handle_missing,
         image_size=tuple(args.image_size)
     )
-    test_dataset.data = test_df.reset_index(drop=True)
+    test_dataset.set_data(test_df)
     
     # Create data loaders
     train_loader = DataLoader(

@@ -109,11 +109,23 @@ class ResNetKeypointDetector(nn.Module):
         
         # Load backbone
         if backbone == 'resnet18':
-            self.backbone = resnet18(pretrained=pretrained)
+            if pretrained:
+                from torchvision.models import ResNet18_Weights
+                self.backbone = resnet18(weights=ResNet18_Weights.IMAGENET1K_V1)
+            else:
+                self.backbone = resnet18(weights=None)
         elif backbone == 'resnet34':
-            self.backbone = resnet34(pretrained=pretrained)
+            if pretrained:
+                from torchvision.models import ResNet34_Weights
+                self.backbone = resnet34(weights=ResNet34_Weights.IMAGENET1K_V1)
+            else:
+                self.backbone = resnet34(weights=None)
         elif backbone == 'resnet50':
-            self.backbone = resnet50(pretrained=pretrained)
+            if pretrained:
+                from torchvision.models import ResNet50_Weights
+                self.backbone = resnet50(weights=ResNet50_Weights.IMAGENET1K_V1)
+            else:
+                self.backbone = resnet50(weights=None)
         else:
             raise ValueError(f"Unsupported backbone: {backbone}")
         
@@ -174,9 +186,17 @@ class EfficientNetKeypointDetector(nn.Module):
         
         # Load backbone
         if backbone == 'efficientnet_b0':
-            self.backbone = efficientnet_b0(pretrained=pretrained)
+            if pretrained:
+                from torchvision.models import EfficientNet_B0_Weights
+                self.backbone = efficientnet_b0(weights=EfficientNet_B0_Weights.IMAGENET1K_V1)
+            else:
+                self.backbone = efficientnet_b0(weights=None)
         elif backbone == 'efficientnet_b2':
-            self.backbone = efficientnet_b2(pretrained=pretrained)
+            if pretrained:
+                from torchvision.models import EfficientNet_B2_Weights
+                self.backbone = efficientnet_b2(weights=EfficientNet_B2_Weights.IMAGENET1K_V1)
+            else:
+                self.backbone = efficientnet_b2(weights=None)
         else:
             raise ValueError(f"Unsupported backbone: {backbone}")
         
