@@ -39,10 +39,10 @@ class DataPreprocessor:
             A.OneOf([
                 A.HorizontalFlip(p=0.5),
                 A.Rotate(limit=15, p=0.5),
-                A.ShiftScaleRotate(
-                    shift_limit=0.1,
-                    scale_limit=0.1,
-                    rotate_limit=10,
+                A.Affine(
+                    translate_percent=0.1,
+                    scale=0.9,
+                    rotate=10,
                     p=0.5
                 ),
             ], p=0.8),
@@ -52,7 +52,7 @@ class DataPreprocessor:
                     contrast_limit=0.2,
                     p=0.5
                 ),
-                A.GaussNoise(variance_limit=(10.0, 50.0), p=0.3),
+                A.GaussNoise(var_limit=(10.0, 50.0), p=0.3),
                 A.GaussianBlur(blur_limit=3, p=0.3),
             ], p=0.5),
             A.Normalize(mean=[0.485], std=[0.229]),  # ImageNet stats for grayscale
