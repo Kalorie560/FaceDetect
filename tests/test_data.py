@@ -53,9 +53,10 @@ class TestDataset(unittest.TestCase):
         for col in keypoint_names:
             # Add some random keypoints with some missing values
             values = np.random.uniform(0, 96, self.num_samples)
-            # Make some values NaN to simulate missing data
-            if np.random.random() < 0.3:  # 30% chance of having missing values
-                values[np.random.choice(self.num_samples, 2, replace=False)] = np.nan
+            # Make some values NaN to simulate missing data, but ensure we keep some complete rows
+            if np.random.random() < 0.15:  # Reduced from 30% to 15% chance of having missing values
+                # Only make 1 value NaN per column that has missing values
+                values[np.random.choice(self.num_samples, 1, replace=False)] = np.nan
             data[col] = values
         
         self.df = pd.DataFrame(data)

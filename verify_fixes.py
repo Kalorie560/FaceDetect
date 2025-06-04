@@ -4,9 +4,13 @@ Quick verification script for the test fixes
 """
 import sys
 import os
+import tempfile
+import numpy as np
+import pandas as pd
 sys.path.append('src')
 
 from models.cnn_model import BasicCNN, DeepCNN, create_model
+from data.dataset import FacialKeypointsDataset
 import torch
 
 def test_pretrained_parameter():
@@ -51,6 +55,72 @@ def test_parameter_count():
         print("❌ DeepCNN has fewer parameters than BasicCNN")
         return False
 
+def test_dataset_creation():
+    """Test dataset creation with reduced missing values"""
+    print("\nTesting dataset creation...")
+    
+    # Create mock data similar to the test
+    num_samples = 10
+    keypoint_names = [
+        'left_eye_center_x', 'left_eye_center_y',
+        'right_eye_center_x', 'right_eye_center_y',
+        'left_eye_inner_corner_x', 'left_eye_inner_corner_y',
+        'left_eye_outer_corner_x', 'left_eye_outer_corner_y',
+        'right_eye_inner_corner_x', 'right_eye_inner_corner_y',
+        'right_eye_outer_corner_x', 'right_eye_outer_corner_y',
+        'left_eyebrow_inner_end_x', 'left_eyebrow_inner_end_y',
+        'left_eyebrow_outer_end_x', 'left_eyebrow_outer_end_y',
+        'right_eyebrow_inner_end_x', 'right_eyebrow_inner_end_y',
+        'right_eyebrow_outer_end_x', 'right_eyebrow_outer_end_y',
+        'nose_tip_x', 'nose_tip_y',
+        'mouth_left_corner_x', 'mouth_left_corner_y',
+        'mouth_right_corner_x', 'mouth_right_corner_y',
+        'mouth_center_top_lip_x', 'mouth_center_top_lip_y',
+        'mouth_center_bottom_lip_x', 'mouth_center_bottom_lip_y'
+    ]
+    
+    data = {}
+    data['Image'] = [' '.join([str(np.random.randint(0, 256)) for _ in range(96*96)]) 
+                    for _ in range(num_samples)]
+    
+    for col in keypoint_names:
+        # Add some random keypoints with reduced missing values
+        values = np.random.uniform(0, 96, num_samples)
+        # Only 15% chance of having missing values, and only 1 NaN per column
+        if np.random.random() < 0.15:
+            values[np.random.choice(num_samples, 1, replace=False)] = np.nan
+        data[col] = values
+    
+    df = pd.DataFrame(data)
+    
+    # Create temporary CSV file
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
+        df.to_csv(f.name, index=False)
+        temp_file = f.name
+    
+    try:
+        dataset = FacialKeypointsDataset(
+            csv_file=temp_file,
+            handle_missing='drop'
+        )
+        
+        print(f"Dataset length: {len(dataset)}")
+        print(f"Original data length: {len(df)}")
+        print(f"Complete rows: {len(df.dropna())}")
+        
+        if len(dataset) > 0:
+            print("✅ Dataset creation test PASSED")
+            return True
+        else:
+            print("❌ Dataset creation test FAILED - empty dataset")
+            return False
+            
+    except Exception as e:
+        print(f"❌ Dataset creation test FAILED - {e}")
+        return False
+    finally:
+        os.unlink(temp_file)
+
 def test_forward_pass():
     """Test forward pass works for both models"""
     print("\nTesting forward pass...")
@@ -88,6 +158,7 @@ def main():
     
     all_passed &= test_pretrained_parameter()
     all_passed &= test_parameter_count()
+    all_passed &= test_dataset_creation()
     all_passed &= test_forward_pass()
     
     print("\n" + "="*50)
