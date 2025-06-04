@@ -279,11 +279,13 @@ class DeepCNN(nn.Module):
         self.adaptive_pool = nn.AdaptiveAvgPool2d((1, 1))
         self.dropout = nn.Dropout(dropout_rate)
         
-        # Fully connected layers - using larger hidden sizes to increase parameters
-        self.fc1 = nn.Linear(512, 2048)
-        self.fc2 = nn.Linear(2048, 1024)
-        self.fc3 = nn.Linear(1024, 512)
-        self.fc4 = nn.Linear(512, num_keypoints)
+        # Fully connected layers - using much larger hidden sizes to ensure more parameters than BasicCNN
+        self.fc1 = nn.Linear(512, 4096)
+        self.fc2 = nn.Linear(4096, 4096)
+        self.fc3 = nn.Linear(4096, 2048)
+        self.fc4 = nn.Linear(2048, 1024)
+        self.fc5 = nn.Linear(1024, 512)
+        self.fc6 = nn.Linear(512, num_keypoints)
     
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -325,7 +327,11 @@ class DeepCNN(nn.Module):
         x = self.dropout(x)
         x = F.relu(self.fc3(x))
         x = self.dropout(x)
-        x = self.fc4(x)
+        x = F.relu(self.fc4(x))
+        x = self.dropout(x)
+        x = F.relu(self.fc5(x))
+        x = self.dropout(x)
+        x = self.fc6(x)
         
         return x
 
