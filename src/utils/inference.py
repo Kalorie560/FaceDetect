@@ -96,6 +96,10 @@ class KeypointsPredictor:
         transformed = self.transform(image=image)
         image_tensor = transformed['image']
         
+        # Ensure we have a tensor (convert from numpy array if needed)
+        if isinstance(image_tensor, np.ndarray):
+            image_tensor = torch.from_numpy(image_tensor)
+        
         # Add batch dimension and ensure correct shape
         if len(image_tensor.shape) == 2:
             image_tensor = image_tensor.unsqueeze(0).unsqueeze(0)  # Add channel and batch dims
