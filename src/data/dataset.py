@@ -180,9 +180,17 @@ class FacialKeypointsDataset(Dataset):
         if self.transform:
             image = self.transform(image)
         else:
-            image = torch.tensor(image, dtype=torch.float32)
+            # Convert numpy array to tensor
+            if isinstance(image, torch.Tensor):
+                image = image.clone().detach().to(torch.float32)
+            else:
+                image = torch.tensor(image, dtype=torch.float32)
         
-        keypoints = torch.tensor(keypoints, dtype=torch.float32)
+        # Convert keypoints to tensor
+        if isinstance(keypoints, torch.Tensor):
+            keypoints = keypoints.clone().detach().to(torch.float32)
+        else:
+            keypoints = torch.tensor(keypoints, dtype=torch.float32)
         
         return {
             'image': image,
