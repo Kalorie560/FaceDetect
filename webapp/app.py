@@ -52,28 +52,72 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
+def find_latest_model():
+    """Find the most recently trained model."""
+    import glob
+    import os
+    
+    # Search for model files in common locations
+    search_paths = [
+        "checkpoints/*.pth",
+        "checkpoints/*.pt", 
+        "models/*.pth",
+        "models/*.pt",
+        "*.pth",
+        "*.pt",
+        "../checkpoints/*.pth",
+        "../checkpoints/*.pt",
+        "../*.pth",
+        "../*.pt"
+    ]
+    
+    model_files = []
+    for pattern in search_paths:
+        model_files.extend(glob.glob(pattern))
+    
+    if not model_files:
+        return None
+    
+    # Return the most recently modified model
+    latest_model = max(model_files, key=os.path.getmtime)
+    return latest_model
+
 @st.cache_resource
-def load_model(model_type, model_path):
-    """Load and cache the model."""
+def load_model_automatically():
+    """Load and cache the latest available model."""
     try:
+        # Find latest model
+        model_path = find_latest_model()
+        if not model_path:
+            return None, None, "No trained model found"
+        
         # Determine device
         device = 'cuda' if torch.cuda.is_available() else 'cpu'
         
-        # Create model
-        model = create_model(model_type=model_type, num_keypoints=30)
+        # Try different model types until one works
+        model_types = ['basic_cnn', 'deep_cnn', 'resnet18', 'resnet34', 'efficientnet_b0']
         
-        # Create predictor
-        predictor = KeypointsPredictor(
-            model=model,
-            model_path=model_path,
-            device=device,
-            image_size=(96, 96)
-        )
+        for model_type in model_types:
+            try:
+                # Create model
+                model = create_model(model_type=model_type, num_keypoints=30)
+                
+                # Create predictor
+                predictor = KeypointsPredictor(
+                    model=model,
+                    model_path=model_path,
+                    device=device,
+                    image_size=(96, 96)
+                )
+                
+                return predictor, device, f"Model loaded: {model_type} from {os.path.basename(model_path)}"
+            except Exception as e:
+                continue
         
-        return predictor, device
+        return None, None, f"Failed to load model from {model_path}"
+        
     except Exception as e:
-        st.error(f"モデルの読み込みに失敗しました / Failed to load model: {e}")
-        return None, None
+        return None, None, f"Error loading model: {e}"
 
 
 def process_uploaded_image(uploaded_file):
@@ -160,9 +204,7 @@ def main():
     # Texts based on language
     if language == "日本語":
         texts = {
-            'model_settings': 'モデル設定',
-            'model_type': 'モデルタイプ',
-            'model_path': 'モデルファイルパス',
+            'model_status': 'モデル状態',
             'image_upload': '画像アップロード',
             'upload_instruction': 'JPEGまたはPNG画像をアップロードしてください',
             'image_requirements': '画像要件',
@@ -181,9 +223,7 @@ def main():
         }
     else:
         texts = {
-            'model_settings': 'Model Settings',
-            'model_type': 'Model Type',
-            'model_path': 'Model File Path',
+            'model_status': 'Model Status',
             'image_upload': 'Image Upload',
             'upload_instruction': 'Please upload a JPEG or PNG image',
             'image_requirements': 'Image Requirements',
@@ -201,30 +241,18 @@ def main():
             'processing': 'Processing...'
         }
     
-    # Sidebar - Model settings
-    st.sidebar.header(texts['model_settings'])
+    # Sidebar - Model status
+    st.sidebar.header(texts['model_status'])
     
-    model_type = st.sidebar.selectbox(
-        texts['model_type'],
-        ['basic_cnn', 'deep_cnn', 'resnet18', 'resnet34', 'efficientnet_b0'],
-        index=0
-    )
+    # Load model automatically
+    predictor, device, status_message = load_model_automatically()
     
-    model_path = st.sidebar.text_input(
-        texts['model_path'],
-        value="checkpoints/best_model.pth",
-        help="Path to the trained model file"
-    )
-    
-    # Load model if path exists
-    predictor = None
-    device = None
-    if os.path.exists(model_path):
-        predictor, device = load_model(model_type, model_path)
-        if predictor:
-            st.sidebar.success(f"✅ Model loaded successfully on {device}")
+    if predictor is not None:
+        st.sidebar.success(f"✅ {status_message}")
+        st.sidebar.info(f"Device: {device}")
     else:
-        st.sidebar.warning("⚠️ Model file not found")
+        st.sidebar.error(f"❌ {status_message}")
+        st.sidebar.info("Please ensure you have trained a model first.")
     
     # Main content area
     col1, col2 = st.columns([1, 1])
