@@ -170,6 +170,103 @@ def create_keypoints_visualization(image_np, keypoints):
         return None
 
 
+def create_annotated_image(image_np, keypoints, language="日本語"):
+    """Create an annotated image with keypoints and labels overlaid."""
+    try:
+        # Copy the original image
+        annotated_image = image_np.copy()
+        
+        # Reshape keypoints to (15, 2) if needed
+        if keypoints.shape[0] == 30:
+            keypoints_2d = keypoints.reshape(15, 2)
+        else:
+            keypoints_2d = keypoints
+        
+        # Define keypoint labels in Japanese and English
+        keypoint_labels = {
+            "日本語": [
+                "左目中心", "右目中心", "左目内角", "左目外角",
+                "右目内角", "右目外角", "左眉内端", "左眉外端",
+                "右眉内端", "右眉外端", "鼻先", "口左角",
+                "口右角", "上唇中央", "下唇中央"
+            ],
+            "English": [
+                "L Eye Center", "R Eye Center", "L Eye Inner", "L Eye Outer",
+                "R Eye Inner", "R Eye Outer", "L Brow Inner", "L Brow Outer",
+                "R Brow Inner", "R Brow Outer", "Nose Tip", "Mouth L",
+                "Mouth R", "Upper Lip", "Lower Lip"
+            ]
+        }
+        
+        # Define colors for different features (BGR format for OpenCV)
+        feature_colors = {
+            'eyes': (0, 255, 0),        # Green
+            'eyebrows': (0, 0, 255),    # Red
+            'nose': (255, 0, 0),        # Blue
+            'mouth': (0, 255, 255)      # Yellow
+        }
+        
+        # Define feature groups
+        feature_groups = {
+            'eyes': [0, 1, 2, 3, 4, 5],      # Eyes
+            'eyebrows': [6, 7, 8, 9],        # Eyebrows
+            'nose': [10],                     # Nose
+            'mouth': [11, 12, 13, 14]        # Mouth
+        }
+        
+        # Get image dimensions
+        h, w = image_np.shape[:2]
+        
+        # Draw keypoints and labels
+        for i, (x, y) in enumerate(keypoints_2d):
+            # Convert normalized coordinates to pixel coordinates
+            pixel_x = int(x * w)
+            pixel_y = int(y * h)
+            
+            # Skip if coordinates are invalid
+            if pixel_x < 0 or pixel_y < 0 or pixel_x >= w or pixel_y >= h:
+                continue
+                
+            # Determine color based on feature group
+            color = (255, 255, 255)  # Default white
+            for feature, indices in feature_groups.items():
+                if i in indices:
+                    color = feature_colors[feature]
+                    break
+            
+            # Draw circle marker
+            cv2.circle(annotated_image, (pixel_x, pixel_y), 5, color, -1)
+            cv2.circle(annotated_image, (pixel_x, pixel_y), 6, (0, 0, 0), 2)  # Black border
+            
+            # Add label
+            label = keypoint_labels[language][i]
+            
+            # Calculate text position (offset to avoid overlapping with point)
+            text_x = pixel_x + 10
+            text_y = pixel_y - 10
+            
+            # Ensure text is within image bounds
+            if text_x + len(label) * 6 > w:
+                text_x = pixel_x - len(label) * 6 - 10
+            if text_y < 20:
+                text_y = pixel_y + 25
+                
+            # Draw text background for better visibility
+            (text_w, text_h), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.4, 1)
+            cv2.rectangle(annotated_image, (text_x - 2, text_y - text_h - 4), 
+                         (text_x + text_w + 2, text_y + 4), (0, 0, 0), -1)
+            
+            # Draw text
+            cv2.putText(annotated_image, label, (text_x, text_y), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
+        
+        return annotated_image
+        
+    except Exception as e:
+        st.error(f"注釈付き画像の作成に失敗しました / Failed to create annotated image: {e}")
+        return None
+
+
 def display_keypoints_table(keypoints):
     """Display keypoints in a table format."""
     # Reshape keypoints to (15, 2)
@@ -311,7 +408,14 @@ def main():
                         </div>
                         """, unsafe_allow_html=True)
                         
-                        # Create and display visualization
+                        # Create and display annotated image
+                        annotated_image = create_annotated_image(image_np, keypoints, language)
+                        if annotated_image is not None:
+                            st.subheader(texts['visualization'])
+                            st.image(annotated_image, caption="検出された顔特徴点 / Detected Facial Keypoints", 
+                                   use_column_width=True)
+                        
+                        # Also create and display the original matplotlib visualization
                         fig = create_keypoints_visualization(image_np, keypoints)
                         if fig is not None:
                             st.pyplot(fig)
