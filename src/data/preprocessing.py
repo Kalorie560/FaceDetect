@@ -56,6 +56,7 @@ class DataPreprocessor:
                 A.GaussianBlur(blur_limit=3, p=0.3),
             ], p=0.5),
             A.Normalize(mean=[0.485], std=[0.229]),  # ImageNet stats for grayscale
+            ToTensorV2(),
         ], keypoint_params=A.KeypointParams(
             format='xy',
             remove_invisible=False,
@@ -72,6 +73,7 @@ class DataPreprocessor:
         return A.Compose([
             A.Resize(height=self.image_size[0], width=self.image_size[1]),
             A.Normalize(mean=[0.485], std=[0.229]),
+            ToTensorV2(),
         ], keypoint_params=A.KeypointParams(
             format='xy',
             remove_invisible=False
@@ -87,6 +89,7 @@ class DataPreprocessor:
         return A.Compose([
             A.Resize(height=self.image_size[0], width=self.image_size[1]),
             A.Normalize(mean=[0.485], std=[0.229]),
+            ToTensorV2(),
         ])
     
     @staticmethod
