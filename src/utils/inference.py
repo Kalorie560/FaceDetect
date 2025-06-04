@@ -6,7 +6,8 @@ import torch
 import torch.nn as nn
 import numpy as np
 import cv2
-from typing import Tuple, Union, Optional, List
+import pandas as pd
+from typing import Tuple, Union, Optional, List, Dict
 from PIL import Image
 import albumentations as A
 from ..data.preprocessing import DataPreprocessor
@@ -351,3 +352,271 @@ def load_predictor(
     )
     
     return predictor
+
+
+class SubmissionGenerator:
+    """
+    Class for generating submission files for the Kaggle Facial Keypoints Detection competition.
+    """
+    
+    # Standard keypoint names in the required order
+    KEYPOINT_NAMES = [
+        'left_eye_center_x', 'left_eye_center_y',
+        'right_eye_center_x', 'right_eye_center_y',
+        'left_eye_inner_corner_x', 'left_eye_inner_corner_y',
+        'left_eye_outer_corner_x', 'left_eye_outer_corner_y',
+        'right_eye_inner_corner_x', 'right_eye_inner_corner_y',
+        'right_eye_outer_corner_x', 'right_eye_outer_corner_y',
+        'left_eyebrow_inner_end_x', 'left_eyebrow_inner_end_y',
+        'left_eyebrow_outer_end_x', 'left_eyebrow_outer_end_y',
+        'right_eyebrow_inner_end_x', 'right_eyebrow_inner_end_y',
+        'right_eyebrow_outer_end_x', 'right_eyebrow_outer_end_y',
+        'nose_tip_x', 'nose_tip_y',
+        'mouth_left_corner_x', 'mouth_left_corner_y',
+        'mouth_right_corner_x', 'mouth_right_corner_y',
+        'mouth_center_top_lip_x', 'mouth_center_top_lip_y',
+        'mouth_center_bottom_lip_x', 'mouth_center_bottom_lip_y'
+    ]
+    
+    def __init__(self, predictor: KeypointsPredictor):
+        """
+        Initialize the submission generator.
+        
+        Args:
+            predictor: Trained KeypointsPredictor instance
+        """
+        self.predictor = predictor
+    
+    @classmethod
+    def load_submission_format(cls, submission_format_file: str) -> pd.DataFrame:
+        """
+        Load the submission format file to understand required predictions.
+        
+        Args:
+            submission_format_file: Path to submissionFileFormat.csv
+            
+        Returns:
+            DataFrame with required submission format
+        """
+        try:
+            submission_df = pd.read_csv(submission_format_file)
+            required_columns = ['RowId', 'ImageId', 'FeatureName', 'Location']
+            
+            # Validate format
+            if not all(col in submission_df.columns for col in required_columns):
+                raise ValueError(f"Submission format file must contain columns: {required_columns}")
+            
+            return submission_df
+        except FileNotFoundError:
+            raise FileNotFoundError(
+                f"Submission format file not found: {submission_format_file}. "
+                "Please download submissionFileFormat.csv from the competition data page."
+            )
+    
+    def predict_test_images(
+        self,
+        test_csv_file: str,
+        batch_size: int = 32
+    ) -> Dict[int, np.ndarray]:
+        """
+        Predict keypoints for all test images.
+        
+        Args:
+            test_csv_file: Path to test.csv file
+            batch_size: Batch size for processing
+            
+        Returns:
+            Dictionary mapping ImageId to predicted keypoints
+        """
+        try:
+            test_df = pd.read_csv(test_csv_file)
+        except FileNotFoundError:
+            raise FileNotFoundError(
+                f"Test file not found: {test_csv_file}. "
+                "Please ensure test.csv is in the correct location."
+            )
+        
+        predictions = {}
+        
+        # Process images in batches
+        for start_idx in range(0, len(test_df), batch_size):
+            end_idx = min(start_idx + batch_size, len(test_df))
+            batch_df = test_df.iloc[start_idx:end_idx]
+            
+            # Prepare batch images
+            batch_images = []
+            image_ids = []
+            
+            for _, row in batch_df.iterrows():
+                # Parse image data (space-separated pixel values)
+                image_data = np.array([int(pixel) for pixel in row['Image'].split()], dtype=np.uint8)
+                image = image_data.reshape(96, 96)
+                
+                batch_images.append(image)
+                # ImageId is typically the index + 1 (1-based indexing)
+                image_ids.append(row.name + 1 if 'ImageId' not in row else row['ImageId'])
+            
+            # Predict keypoints for batch
+            batch_predictions = self.predictor.predict_batch(batch_images, batch_size=len(batch_images))
+            
+            # Store predictions with ImageId
+            for img_id, pred in zip(image_ids, batch_predictions):
+                predictions[img_id] = pred
+            
+            print(f"Processed batch {start_idx//batch_size + 1}/{(len(test_df) + batch_size - 1)//batch_size}")
+        
+        return predictions
+    
+    def generate_submission_file(
+        self,
+        test_csv_file: str,
+        submission_format_file: str,
+        output_file: str = 'submission.csv',
+        batch_size: int = 32
+    ) -> str:
+        """
+        Generate submission file for the competition.
+        
+        Args:
+            test_csv_file: Path to test.csv file
+            submission_format_file: Path to submissionFileFormat.csv
+            output_file: Output submission file path
+            batch_size: Batch size for processing
+            
+        Returns:
+            Path to generated submission file
+        """
+        print("Loading submission format...")
+        submission_format = self.load_submission_format(submission_format_file)
+        
+        print("Predicting keypoints for test images...")
+        predictions = self.predict_test_images(test_csv_file, batch_size)
+        
+        print("Generating submission file...")
+        submission_rows = []
+        
+        # Process each row in the submission format
+        for _, row in submission_format.iterrows():
+            row_id = row['RowId']
+            image_id = row['ImageId']
+            feature_name = row['FeatureName']
+            
+            # Get prediction for this image
+            if image_id in predictions:
+                pred_keypoints = predictions[image_id]
+                
+                # Find the index of this feature in our standard order
+                if feature_name in self.KEYPOINT_NAMES:
+                    feature_idx = self.KEYPOINT_NAMES.index(feature_name)
+                    predicted_location = pred_keypoints[feature_idx]
+                else:
+                    # If feature not found, use NaN (will need manual handling)
+                    predicted_location = np.nan
+                    print(f"Warning: Unknown feature name: {feature_name}")
+            else:
+                # If image not found, use NaN
+                predicted_location = np.nan
+                print(f"Warning: No prediction found for ImageId: {image_id}")
+            
+            submission_rows.append({
+                'RowId': row_id,
+                'ImageId': image_id,
+                'FeatureName': feature_name,
+                'Location': predicted_location
+            })
+        
+        # Create submission DataFrame
+        submission_df = pd.DataFrame(submission_rows)
+        
+        # Save to file
+        submission_df.to_csv(output_file, index=False)
+        
+        print(f"Submission file saved to: {output_file}")
+        print(f"Total predictions: {len(submission_df)}")
+        print(f"Missing predictions: {submission_df['Location'].isna().sum()}")
+        
+        return output_file
+    
+    def validate_submission(self, submission_file: str) -> Dict[str, any]:
+        """
+        Validate the generated submission file.
+        
+        Args:
+            submission_file: Path to submission file
+            
+        Returns:
+            Dictionary with validation results
+        """
+        submission_df = pd.read_csv(submission_file)
+        
+        validation_results = {
+            'total_rows': len(submission_df),
+            'missing_values': submission_df['Location'].isna().sum(),
+            'unique_images': submission_df['ImageId'].nunique(),
+            'unique_features': submission_df['FeatureName'].nunique(),
+            'feature_names': sorted(submission_df['FeatureName'].unique()),
+            'valid_predictions': len(submission_df) - submission_df['Location'].isna().sum(),
+            'completion_rate': (len(submission_df) - submission_df['Location'].isna().sum()) / len(submission_df) * 100
+        }
+        
+        # Check for required columns
+        required_columns = ['RowId', 'ImageId', 'FeatureName', 'Location']
+        missing_columns = [col for col in required_columns if col not in submission_df.columns]
+        validation_results['missing_columns'] = missing_columns
+        
+        return validation_results
+
+
+def create_submission_file(
+    model_path: str,
+    model_class: type,
+    test_csv_file: str,
+    submission_format_file: str,
+    output_file: str = 'submission.csv',
+    device: str = 'cuda',
+    batch_size: int = 32,
+    **model_kwargs
+) -> str:
+    """
+    Convenience function to create submission file from model and data files.
+    
+    Args:
+        model_path: Path to saved model weights
+        model_class: Model class to instantiate
+        test_csv_file: Path to test.csv file
+        submission_format_file: Path to submissionFileFormat.csv
+        output_file: Output submission file path
+        device: Device to run inference on
+        batch_size: Batch size for processing
+        **model_kwargs: Additional arguments for model initialization
+        
+    Returns:
+        Path to generated submission file
+    """
+    # Load predictor
+    predictor = load_predictor(
+        model_class=model_class,
+        model_path=model_path,
+        device=device,
+        **model_kwargs
+    )
+    
+    # Create submission generator
+    submission_generator = SubmissionGenerator(predictor)
+    
+    # Generate submission file
+    output_path = submission_generator.generate_submission_file(
+        test_csv_file=test_csv_file,
+        submission_format_file=submission_format_file,
+        output_file=output_file,
+        batch_size=batch_size
+    )
+    
+    # Validate submission
+    validation_results = submission_generator.validate_submission(output_path)
+    
+    print("\nSubmission Validation Results:")
+    for key, value in validation_results.items():
+        print(f"  {key}: {value}")
+    
+    return output_path

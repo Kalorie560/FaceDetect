@@ -14,6 +14,7 @@ This project implements a comprehensive solution for the Kaggle Facial Keypoints
 - **Data Augmentation**: Robust preprocessing with rotation, scaling, brightness adjustments, and noise using Albumentations and imgaug
 - **Experiment Tracking**: ClearML integration for monitoring training progress and metrics
 - **Web Application**: Interactive Streamlit app with enhanced UI components for real-time keypoint detection
+- **Submission Generation**: Automated generation of competition submission files in the required CSV format
 - **Comprehensive Testing**: Unit tests, integration tests, and automated test runner
 - **Bilingual Support**: Both Japanese and English interfaces
 - **Data Exploration**: Jupyter notebook for dataset analysis and visualization
@@ -50,6 +51,10 @@ FaceDetect/
 ├── test_fix.py           # Additional test utilities
 ├── test_json_fix.py      # JSON handling test utilities
 ├── test_transforms.py    # Data transformation tests
+├── generate_submission.py # Submission file generation script
+├── test_submission_generator.py # Tests for submission generator
+├── examples/             # Example scripts and tutorials
+│   └── submission_example.py # Submission generation examples
 ├── test_training.csv     # Sample training data for testing
 ├── verify_fixes.py       # Fix verification script
 ├── requirements.txt      # Python dependencies
@@ -269,6 +274,136 @@ streamlit run webapp/app.py
 - Confidence score display
 - Coordinate values table
 - Results download in JSON format
+
+### Generating Submission Files
+
+Generate submission files for the Kaggle competition using trained models.
+
+#### Quick Start - Command Line
+
+```bash
+# Generate submission file using command line script
+python generate_submission.py \
+    --model_path models/resnet18_best.pth \
+    --model_type resnet18 \
+    --test_csv test.csv \
+    --submission_format submissionFileFormat.csv \
+    --output submission.csv
+```
+
+#### Required Files
+
+Before generating submissions, ensure you have:
+
+1. **Trained Model**: `.pth` file with your trained model weights
+2. **Test Data**: `test.csv` from Kaggle competition (1783 test images)
+3. **Submission Format**: `submissionFileFormat.csv` from Kaggle (defines required predictions)
+
+```bash
+# Download competition data using Kaggle CLI
+kaggle competitions download -c facial-keypoints-detection
+
+# Extract files
+unzip facial-keypoints-detection.zip
+```
+
+#### Programmatic Usage
+
+```python
+from src.utils.inference import create_submission_file
+from src.models.cnn_model import create_model
+
+# Generate submission file
+output_path = create_submission_file(
+    model_path='models/resnet18_best.pth',
+    model_class=lambda **kwargs: create_model('resnet18', **kwargs),
+    test_csv_file='test.csv',
+    submission_format_file='submissionFileFormat.csv',
+    output_file='submission.csv',
+    device='cuda',
+    batch_size=32
+)
+
+print(f"Submission file created: {output_path}")
+```
+
+#### Advanced Usage
+
+```python
+from src.utils.inference import SubmissionGenerator, load_predictor
+from src.models.cnn_model import ResNetKeypointDetector
+
+# Load predictor with custom model
+predictor = load_predictor(
+    model_class=ResNetKeypointDetector,
+    model_path='models/resnet18_best.pth',
+    device='cuda',
+    backbone='resnet18',
+    pretrained=True
+)
+
+# Create submission generator
+submission_generator = SubmissionGenerator(predictor)
+
+# Generate and validate submission
+output_path = submission_generator.generate_submission_file(
+    test_csv_file='test.csv',
+    submission_format_file='submissionFileFormat.csv',
+    output_file='submission.csv',
+    batch_size=32
+)
+
+# Validate submission format
+validation_results = submission_generator.validate_submission(output_path)
+print("Validation results:", validation_results)
+```
+
+#### Submission Format
+
+The generated CSV file follows the competition requirements:
+
+```csv
+RowId,ImageId,FeatureName,Location
+1,1,left_eye_center_x,37.5
+2,1,left_eye_center_y,32.4
+3,1,right_eye_center_x,59.6
+4,1,right_eye_center_y,32.8
+...
+```
+
+- **RowId**: Sequential ID for each prediction
+- **ImageId**: Test image ID (1-1783)
+- **FeatureName**: Facial keypoint name (e.g., 'left_eye_center_x')
+- **Location**: Predicted coordinate value
+
+#### Supported Models
+
+All trained model architectures are supported:
+
+```bash
+# Basic CNN
+python generate_submission.py --model_type basic_cnn --model_path models/basic_cnn.pth
+
+# Deep CNN
+python generate_submission.py --model_type deep_cnn --model_path models/deep_cnn.pth
+
+# ResNet variants
+python generate_submission.py --model_type resnet18 --model_path models/resnet18.pth
+python generate_submission.py --model_type resnet34 --model_path models/resnet34.pth
+
+# EfficientNet variants
+python generate_submission.py --model_type efficientnet_b0 --model_path models/efficientnet_b0.pth
+```
+
+#### Testing Submission Generator
+
+```bash
+# Test the submission generator functionality
+python test_submission_generator.py
+
+# Run example scripts
+python examples/submission_example.py
+```
 
 ### Results and Evaluation
 
