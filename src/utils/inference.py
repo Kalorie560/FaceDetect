@@ -10,7 +10,7 @@ import pandas as pd
 from typing import Tuple, Union, Optional, List, Dict
 from PIL import Image
 import albumentations as A
-from ..data.preprocessing import DataPreprocessor
+from data.preprocessing import DataPreprocessor
 
 
 class KeypointsPredictor:
