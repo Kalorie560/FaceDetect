@@ -279,25 +279,25 @@ streamlit run webapp/app.py
 
 Generate submission files for the Kaggle competition using trained models.
 
-#### Quick Start - Command Line
+#### Quick Start - Simple Execution
 
 ```bash
-# Generate submission file using command line script
-python generate_submission.py \
-    --model_path models/resnet18_best.pth \
-    --model_type resnet18 \
-    --test_csv test.csv \
-    --submission_format submissionFileFormat.csv \
-    --output submission.csv
+# Simply run the script - no arguments needed!
+python generate_submission.py
 ```
+
+The script will automatically:
+- 🔍 **Find trained models** - Searches for `.pth` files in the project directory
+- 🤖 **Detect model type** - Automatically identifies model architecture from filename
+- 📋 **Generate format** - Creates the required submission format without needing `submissionFileFormat.csv`
+- 🚀 **Create submission** - Generates `submission.csv` ready for Kaggle upload
 
 #### Required Files
 
 Before generating submissions, ensure you have:
 
-1. **Trained Model**: `.pth` file with your trained model weights
+1. **Trained Model**: Any `.pth` file with trained model weights (script will auto-detect the most recent one)
 2. **Test Data**: `test.csv` from Kaggle competition (1783 test images)
-3. **Submission Format**: `submissionFileFormat.csv` from Kaggle (defines required predictions)
 
 ```bash
 # Download competition data using Kaggle CLI
@@ -307,55 +307,35 @@ kaggle competitions download -c facial-keypoints-detection
 unzip facial-keypoints-detection.zip
 ```
 
+#### Model Type Auto-Detection
+
+The script automatically detects model type based on filename:
+
+- **ResNet models**: `resnet18_model.pth`, `my_resnet34.pth`, `resnet50_best.pth`
+- **EfficientNet models**: `efficientnet_b0.pth`, `efficient_b2_trained.pth`
+- **CNN models**: `basic_cnn.pth`, `deep_cnn_model.pth`
+
+If detection fails, it defaults to ResNet18.
+
 #### Programmatic Usage
 
 ```python
-from src.utils.inference import create_submission_file
+from src.utils.inference import SubmissionGenerator, KeypointsPredictor
 from src.models.cnn_model import create_model
 
-# Generate submission file
-output_path = create_submission_file(
-    model_path='models/resnet18_best.pth',
-    model_class=lambda **kwargs: create_model('resnet18', **kwargs),
-    test_csv_file='test.csv',
-    submission_format_file='submissionFileFormat.csv',
-    output_file='submission.csv',
-    device='cuda',
-    batch_size=32
-)
-
-print(f"Submission file created: {output_path}")
-```
-
-#### Advanced Usage
-
-```python
-from src.utils.inference import SubmissionGenerator, load_predictor
-from src.models.cnn_model import ResNetKeypointDetector
-
-# Load predictor with custom model
-predictor = load_predictor(
-    model_class=ResNetKeypointDetector,
-    model_path='models/resnet18_best.pth',
-    device='cuda',
-    backbone='resnet18',
-    pretrained=True
-)
+# Create model and predictor
+model = create_model('resnet18', num_keypoints=30)
+predictor = KeypointsPredictor(model=model, model_path='my_model.pth')
 
 # Create submission generator
 submission_generator = SubmissionGenerator(predictor)
 
-# Generate and validate submission
+# Generate submission file with auto-format
 output_path = submission_generator.generate_submission_file(
     test_csv_file='test.csv',
-    submission_format_file='submissionFileFormat.csv',
-    output_file='submission.csv',
-    batch_size=32
+    submission_format_file='temp_format.csv',  # Auto-generated
+    output_file='submission.csv'
 )
-
-# Validate submission format
-validation_results = submission_generator.validate_submission(output_path)
-print("Validation results:", validation_results)
 ```
 
 #### Submission Format
@@ -378,22 +358,14 @@ RowId,ImageId,FeatureName,Location
 
 #### Supported Models
 
-All trained model architectures are supported:
+All trained model architectures are automatically supported:
 
-```bash
-# Basic CNN
-python generate_submission.py --model_type basic_cnn --model_path models/basic_cnn.pth
+- **BasicCNN**: Lightweight 4-layer CNN
+- **DeepCNN**: Enhanced 5-layer CNN with residual connections
+- **ResNet**: ResNet18, ResNet34, ResNet50 variants
+- **EfficientNet**: EfficientNet-B0, EfficientNet-B2 variants
 
-# Deep CNN
-python generate_submission.py --model_type deep_cnn --model_path models/deep_cnn.pth
-
-# ResNet variants
-python generate_submission.py --model_type resnet18 --model_path models/resnet18.pth
-python generate_submission.py --model_type resnet34 --model_path models/resnet34.pth
-
-# EfficientNet variants
-python generate_submission.py --model_type efficientnet_b0 --model_path models/efficientnet_b0.pth
-```
+Simply place your trained `.pth` file in the project directory and run the script!
 
 #### Testing Submission Generator
 
@@ -644,6 +616,72 @@ streamlit run webapp/app.py
 - 特徴点の座標値表示
 - 信頼度スコアの表示
 - JSON形式での結果ダウンロード
+
+### 提出ファイルの生成
+
+学習済みモデルを使用してKaggleコンペティション用の提出ファイルを生成します。
+
+#### 簡単実行 - 引数不要
+
+```bash
+# スクリプトを実行するだけ - 引数は不要です！
+python generate_submission.py
+```
+
+スクリプトは自動的に以下を実行します：
+- 🔍 **モデル検索** - プロジェクトディレクトリ内の`.pth`ファイルを検索
+- 🤖 **モデル種別検出** - ファイル名からモデルアーキテクチャを自動識別
+- 📋 **フォーマット生成** - `submissionFileFormat.csv`を必要とせずに必要な提出フォーマットを作成
+- 🚀 **提出ファイル作成** - Kaggleアップロード準備完了の`submission.csv`を生成
+
+#### 必要ファイル
+
+提出ファイル生成前に以下を確保してください：
+
+1. **学習済みモデル**: 学習済みモデル重みの`.pth`ファイル（スクリプトが最新のものを自動検出）
+2. **テストデータ**: Kaggleコンペティションの`test.csv`（1783テスト画像）
+
+```bash
+# Kaggle CLIでコンペティションデータをダウンロード
+kaggle competitions download -c facial-keypoints-detection
+
+# ファイルを展開
+unzip facial-keypoints-detection.zip
+```
+
+#### モデル種別の自動検出
+
+スクリプトはファイル名に基づいてモデル種別を自動検出します：
+
+- **ResNetモデル**: `resnet18_model.pth`, `my_resnet34.pth`, `resnet50_best.pth`
+- **EfficientNetモデル**: `efficientnet_b0.pth`, `efficient_b2_trained.pth`
+- **CNNモデル**: `basic_cnn.pth`, `deep_cnn_model.pth`
+
+検出に失敗した場合、デフォルトでResNet18を使用します。
+
+#### サポートされるモデル
+
+全ての学習済みモデルアーキテクチャが自動的にサポートされます：
+
+- **BasicCNN**: 軽量4層CNN
+- **DeepCNN**: 残差接続を持つ強化5層CNN
+- **ResNet**: ResNet18、ResNet34、ResNet50バリエーション
+- **EfficientNet**: EfficientNet-B0、EfficientNet-B2バリエーション
+
+学習済み`.pth`ファイルをプロジェクトディレクトリに配置してスクリプトを実行するだけです！
+
+#### 提出フォーマット
+
+生成されるCSVファイルはコンペティション要件に従います：
+
+```csv
+RowId,ImageId,FeatureName,Location
+1,1,left_eye_center_x,37.5
+2,1,left_eye_center_y,32.4
+3,1,right_eye_center_x,59.6
+4,1,right_eye_center_y,32.8
+...
+```
 
 ### テスト実行
 
