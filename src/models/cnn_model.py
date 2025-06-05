@@ -62,7 +62,7 @@ class BasicCNN(nn.Module):
             x: Input tensor of shape (batch_size, 1, 96, 96)
             
         Returns:
-            Output tensor of shape (batch_size, num_keypoints) with coordinates clamped to [0, 96]
+            Output tensor of shape (batch_size, num_keypoints) with coordinates clamped to [0, 1]
         """
         # Convolutional layers with activation and pooling
         x = self.pool(F.relu(self.bn1(self.conv1(x))))
@@ -80,8 +80,8 @@ class BasicCNN(nn.Module):
         x = self.dropout(x)
         x = self.fc3(x)
         
-        # Clamp coordinates to [0, 96] range for 96x96 images
-        x = torch.clamp(x, min=0.0, max=96.0)
+        # Clamp coordinates to [0, 1] range (normalized coordinates)
+        x = torch.clamp(x, min=0.0, max=1.0)
         
         return x
 
@@ -158,12 +158,12 @@ class ResNetKeypointDetector(nn.Module):
             x: Input tensor of shape (batch_size, 1, 96, 96)
             
         Returns:
-            Output tensor of shape (batch_size, num_keypoints) with coordinates clamped to [0, 96]
+            Output tensor of shape (batch_size, num_keypoints) with coordinates clamped to [0, 1]
         """
         x = self.backbone(x)
         
-        # Clamp coordinates to [0, 96] range for 96x96 images
-        x = torch.clamp(x, min=0.0, max=96.0)
+        # Clamp coordinates to [0, 1] range (normalized coordinates)
+        x = torch.clamp(x, min=0.0, max=1.0)
         
         return x
 
@@ -235,12 +235,12 @@ class EfficientNetKeypointDetector(nn.Module):
             x: Input tensor of shape (batch_size, 1, 96, 96)
             
         Returns:
-            Output tensor of shape (batch_size, num_keypoints) with coordinates clamped to [0, 96]
+            Output tensor of shape (batch_size, num_keypoints) with coordinates clamped to [0, 1]
         """
         x = self.backbone(x)
         
-        # Clamp coordinates to [0, 96] range for 96x96 images
-        x = torch.clamp(x, min=0.0, max=96.0)
+        # Clamp coordinates to [0, 1] range (normalized coordinates)
+        x = torch.clamp(x, min=0.0, max=1.0)
         
         return x
 
@@ -308,7 +308,7 @@ class DeepCNN(nn.Module):
             x: Input tensor of shape (batch_size, 1, 96, 96)
             
         Returns:
-            Output tensor of shape (batch_size, num_keypoints) with coordinates clamped to [0, 96]
+            Output tensor of shape (batch_size, num_keypoints) with coordinates clamped to [0, 1]
         """
         # First block
         x = F.relu(self.conv1(x))
@@ -346,8 +346,8 @@ class DeepCNN(nn.Module):
         x = self.dropout(x)
         x = self.fc6(x)
         
-        # Clamp coordinates to [0, 96] range for 96x96 images
-        x = torch.clamp(x, min=0.0, max=96.0)
+        # Clamp coordinates to [0, 1] range (normalized coordinates)
+        x = torch.clamp(x, min=0.0, max=1.0)
         
         return x
 

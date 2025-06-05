@@ -12,7 +12,7 @@ import numpy as np
 from models.cnn_model import create_model
 
 def test_coordinate_clamp():
-    """Test that all models properly clamp coordinates to [0, 96] range"""
+    """Test that all models properly clamp coordinates to [0, 1] range (normalized)"""
     
     print("🧪 Testing coordinate clamping for all model types...")
     
@@ -50,11 +50,11 @@ def test_coordinate_clamp():
             if min_val < 0.0:
                 print(f"❌ {model_type}: Minimum coordinate {min_val:.4f} is below 0.0")
                 all_tests_passed = False
-            elif max_val > 96.0:
-                print(f"❌ {model_type}: Maximum coordinate {max_val:.4f} is above 96.0")
+            elif max_val > 1.0:
+                print(f"❌ {model_type}: Maximum coordinate {max_val:.4f} is above 1.0")
                 all_tests_passed = False
             else:
-                print(f"✅ {model_type}: Coordinates properly clamped to [0.0, 96.0]")
+                print(f"✅ {model_type}: Coordinates properly clamped to [0.0, 1.0]")
                 print(f"   Range: [{min_val:.4f}, {max_val:.4f}]")
             
         except Exception as e:
@@ -66,10 +66,10 @@ def test_coordinate_clamp():
     print("="*60)
     
     if all_tests_passed:
-        print("🎉 All models successfully clamp coordinates to [0, 96] range!")
+        print("🎉 All models successfully clamp coordinates to [0, 1] range!")
         print("\n✅ Implementation verified:")
-        print("   • All model forward functions include torch.clamp(x, min=0.0, max=96.0)")
-        print("   • Output coordinates are guaranteed to be within [0, 96] for 96x96 images")
+        print("   • All model forward functions include torch.clamp(x, min=0.0, max=1.0)")
+        print("   • Output coordinates are normalized to [0, 1] range")
         print("   • Both x and y coordinates are properly constrained")
     else:
         print("❌ Some coordinate clamping tests failed.")
@@ -102,7 +102,7 @@ def test_extreme_case():
     
     print(f"   Output range with extreme weights: [{min_val:.4f}, {max_val:.4f}]")
     
-    if min_val >= 0.0 and max_val <= 96.0:
+    if min_val >= 0.0 and max_val <= 1.0:
         print("✅ Extreme case test passed - clamping works even with large weights!")
         return True
     else:
@@ -127,7 +127,7 @@ if __name__ == "__main__":
     if main_test_passed and extreme_test_passed:
         print("🎉 ALL TESTS PASSED!")
         print("✅ Coordinate clamping implementation is working correctly.")
-        print("✅ All models will output coordinates within [0, 96] range for 96x96 images.")
+        print("✅ All models will output normalized coordinates within [0, 1] range.")
         sys.exit(0)
     else:
         print("❌ SOME TESTS FAILED!")
