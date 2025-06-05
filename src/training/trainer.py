@@ -305,7 +305,10 @@ class FacialKeypointsTrainer:
             
             # Update learning rate
             if self.scheduler:
-                self.scheduler.step()
+                if isinstance(self.scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
+                    self.scheduler.step(val_loss)
+                else:
+                    self.scheduler.step()
             
             # Update history
             self.history['train_loss'].append(train_loss)
